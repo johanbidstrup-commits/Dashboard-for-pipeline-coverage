@@ -371,7 +371,10 @@
     min-width: 0;
   }
   /* Step 4: charts and filter rows always wrap */
-  body.embed-mode .chart-wrap         { width: 100%; min-width: 0; }
+  body.embed-mode .chart-wrap         { width: 100%; min-width: 0; overflow: hidden; }
+  body.embed-mode .card               { overflow: hidden; }
+  /* Force Chart.js canvases to never exceed their container */
+  body.embed-mode canvas              { max-width: 100% !important; display: block; }
   body.embed-mode .coverage-indicator { gap: 8px; flex-wrap: wrap; }
   body.embed-mode .filter-row         { flex-wrap: wrap; gap: 6px; }
   body.embed-mode .chart-local-filter { flex-wrap: wrap; }
@@ -1840,9 +1843,25 @@ function isInIframe() {
 function hasEmbedParam() {
   return /[?&]embed=1/.test(window.location.search);
 }
+function resizeAllCharts() {
+  Object.values(charts).forEach(c => { try { c.resize(); } catch(e){} });
+}
 function enableEmbedMode() {
   document.body.classList.add('embed-mode');
-  // Sync the global year select default if needed
+  // After the page has rendered all charts, force them to resize to the
+  // actual iframe/container width (Chart.js may have measured too early)
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(resizeAllCharts, 50);
+    setTimeout(resizeAllCharts, 300);
+  });
+  // Also handle dynamic viewport changes (e.g. orientation change)
+  if (window.ResizeObserver) {
+    let resizeTimer;
+    new ResizeObserver(() => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(resizeAllCharts, 100);
+    }).observe(document.documentElement);
+  }
 }
 function toggleEmbedSettings() {
   const bar = document.querySelector('.targets-bar');
