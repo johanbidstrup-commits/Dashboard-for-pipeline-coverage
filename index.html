@@ -342,22 +342,44 @@
   body.embed-mode #channelTooltip { min-width: 280px; max-width: 340px; }
 
 
-  /* ── Mobile embed overflow prevention ── */
+  /* ── Mobile embed / iframe overflow prevention ─────────────── */
+  /* Step 1: lock the viewport */
   body.embed-mode {
     overflow-x: hidden;
     width: 100%;
-  }
-  body.embed-mode .grid,
-  body.embed-mode .kpi-bar,
-  body.embed-mode .targets-bar,
-  body.embed-mode .global-filter-bar,
-  body.embed-mode .upload-bar,
-  body.embed-mode .embed-toolbar {
     max-width: 100vw;
+  }
+  /* Step 2: every layout container must not exceed 100% */
+  body.embed-mode .header,
+  body.embed-mode .upload-bar,
+  body.embed-mode .global-filter-bar,
+  body.embed-mode .targets-bar,
+  body.embed-mode .embed-toolbar,
+  body.embed-mode .kpi-bar,
+  body.embed-mode .grid {
+    max-width: 100%;
+    box-sizing: border-box;
     overflow-x: hidden;
   }
-  body.embed-mode .chart-wrap { width: 100%; }
+  /* Step 3: flex/grid children must be allowed to shrink below content size */
+  body.embed-mode .card,
+  body.embed-mode .kpi-card,
+  body.embed-mode .header > *,
+  body.embed-mode .kpi-bar > *,
+  body.embed-mode .upload-bar > *,
+  body.embed-mode .global-filter-bar > * {
+    min-width: 0;
+  }
+  /* Step 4: charts and filter rows always wrap */
+  body.embed-mode .chart-wrap         { width: 100%; min-width: 0; }
   body.embed-mode .coverage-indicator { gap: 8px; flex-wrap: wrap; }
+  body.embed-mode .filter-row         { flex-wrap: wrap; gap: 6px; }
+  body.embed-mode .chart-local-filter { flex-wrap: wrap; }
+  body.embed-mode .upload-bar         { flex-wrap: wrap; }
+  /* Step 5: form elements can't exceed their container */
+  body.embed-mode select,
+  body.embed-mode input[type=text],
+  body.embed-mode input[type=number]  { max-width: 100%; }
 
   @media (max-width: 540px) {
     body.embed-mode .insight-card {
@@ -373,16 +395,18 @@
     body.embed-mode .grid { padding: 0 8px 10px; gap: 8px; }
     body.embed-mode .target-field input { width: 72px; font-size: 10px; }
     body.embed-mode #channelTooltip {
-      min-width: unset; max-width: calc(100vw - 16px);
-      font-size: 11px;
+      min-width: unset; max-width: calc(100vw - 16px); font-size: 11px;
     }
-    body.embed-mode .ct-row {
-      grid-template-columns: 1fr 80px;
-    }
+    body.embed-mode .ct-row { grid-template-columns: 1fr 80px; }
     body.embed-mode .ct-row .ct-src,
     body.embed-mode .ct-row .ct-date { display: none; }
-    body.embed-mode .filter-row { flex-wrap: wrap; gap: 6px; }
-    body.embed-mode .chart-local-filter { flex-wrap: wrap; }
+  }
+  @media (max-width: 380px) {
+    body.embed-mode .kpi-bar  { grid-template-columns: 1fr 1fr; gap: 4px; padding: 6px 8px; }
+    body.embed-mode .kpi-value { font-size: 13px; }
+    body.embed-mode .kpi-label { font-size: 9px; }
+    body.embed-mode .grid { padding: 0 6px 8px; gap: 6px; }
+    body.embed-mode .card h2 { font-size: 12px; }
   }
 </style>
 </head>
