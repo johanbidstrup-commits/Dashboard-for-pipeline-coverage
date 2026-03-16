@@ -202,6 +202,23 @@
     .kpi-bar { padding: 12px 16px; gap: 10px; }
   }
 
+  /* ── Insight card: compact when in a half-width column (901px–1300px) ── */
+  @media (min-width: 901px) and (max-width: 1300px) {
+    .insight-card { gap: 10px; padding: 8px 12px; }
+    .insight-rank   { min-width: 80px; font-size: 10px; letter-spacing: 0; }
+    .insight-source { min-width: 100px; font-size: 12px; }
+    .insight-stats  { gap: 10px; flex-wrap: wrap; }
+    .insight-stat-val { font-size: 12px; }
+    .insight-stat-lbl { font-size: 10px; }
+    .insight-badge  { font-size: 11px; padding: 2px 8px; }
+  }
+  @media (min-width: 901px) and (max-width: 1050px) {
+    .insight-card { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .insight-rank   { min-width: unset; }
+    .insight-source { min-width: unset; font-size: 13px; }
+    .insight-badge  { margin-left: 0 !important; }
+  }
+
   /* ── Tablet portrait (≤900px) ────────────────────────────────  */
   @media (max-width: 900px) {
     .header { padding: 12px 16px; }
@@ -543,7 +560,7 @@
     </div>
   </div>
 
-  <div id="insightBox" class="card grid-full"></div>
+  <div id="insightBox" class="card"></div>
 
   <div class="card">
     <h2>Win Rate by Source</h2>
