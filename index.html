@@ -2037,8 +2037,12 @@ function renderChannelChart() {
   const tooltip = document.getElementById('channelTooltip');
   let ttHideTimer = null;
 
-  function ctBuildContent(ch, q, deals, total) {
+  function ctBuildContent(ch, q, deals, total, quarterTotal) {
     const chColor = {Inbound:'#818cf8', Outbound:'#fbbf24', Partner:'#34d399'}[ch] || '#fff';
+    const pct = quarterTotal > 0 ? Math.round(total / quarterTotal * 100) : null;
+    const pctBadge = pct !== null
+      ? `<span style="background:${chColor}22;color:${chColor};font-weight:700;font-size:12px;padding:2px 8px;border-radius:99px;margin-left:4px">${pct}%</span>`
+      : '';
     const rows = deals.map(d => `
       <div class="ct-row">
         <span class="ct-deal-name" title="${d.name}">${d.name}</span>
@@ -2048,8 +2052,8 @@ function renderChannelChart() {
       </div>`).join('');
     return `
       <div class="ct-header">
-        <span class="ct-title" style="color:${chColor}">${ch} · ${q}</span>
-        <span class="ct-total">DKK ${fmtFull(total)} total · ${deals.length} deal${deals.length!==1?'s':''}</span>
+        <span class="ct-title" style="color:${chColor}">${ch} · ${q}</span>${pctBadge}
+        <span class="ct-total">DKK ${fmtFull(total)} · ${deals.length} deal${deals.length!==1?'s':''}</span>
         <button class="ct-close" onclick="var t=document.getElementById('channelTooltip');t.classList.remove('visible');t._pinned=false;">✕</button>
       </div>
       <div class="ct-col-hdr">
@@ -2080,7 +2084,8 @@ function renderChannelChart() {
     const q  = quarters[index];
     const deals = dealMap[q + '|' + ch] || [];
     const total = byQ[q]?.[ch] || 0;
-    tooltip.innerHTML = ctBuildContent(ch, q, deals, total);
+    const quarterTotal = CHANNELS.reduce((s, c) => s + (byQ[q]?.[c] || 0), 0);
+    tooltip.innerHTML = ctBuildContent(ch, q, deals, total, quarterTotal);
     tooltip._pinned = pinned;
     tooltip.classList.add('visible');
     ctPosition(clientX, clientY);
