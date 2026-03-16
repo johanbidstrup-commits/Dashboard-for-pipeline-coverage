@@ -72,16 +72,31 @@
   .badge-fourth { background: #ede9fe; color: #5b21b6; }
   .badge-fifth  { background: #fce7f3; color: #9d174d; }
 
-  /* ── Channel hover tooltip ── */
-  #channelTooltip {
+  /* ── Shared dashboard tooltips ── */
+  #channelTooltip, #coverageTooltip, #insightTooltip {
     display: none; position: fixed; z-index: 9999;
     background: #1a1a2e; color: #f8fafc; border-radius: 10px;
-    padding: 0; min-width: 340px; max-width: 480px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
-    font-size: 12px; pointer-events: auto;
-    overflow: hidden;
+    padding: 0; box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+    font-size: 12px; pointer-events: auto; overflow: hidden;
   }
-  #channelTooltip.visible { display: block; }
+  #channelTooltip.visible, #coverageTooltip.visible, #insightTooltip.visible { display: block; }
+  #channelTooltip  { min-width: 340px; max-width: 480px; }
+  #coverageTooltip { min-width: 380px; max-width: 520px; }
+  #insightTooltip  { min-width: 300px; max-width: 380px; }
+  /* Coverage stats bar */
+  .ct-stats-bar { display: flex; gap: 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .ct-stat-cell { flex: 1; padding: 8px 12px; border-right: 1px solid rgba(255,255,255,0.08); }
+  .ct-stat-cell:last-child { border-right: none; }
+  .ct-stat-big  { font-size: 17px; font-weight: 800; }
+  .ct-stat-sub  { font-size: 10px; opacity: 0.5; margin-top: 1px; }
+  /* Insight tooltip sections */
+  .it-section { padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .it-section:last-child { border-bottom: none; }
+  .it-section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.4; margin-bottom: 6px; }
+  .it-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+  .it-kv-val { font-size: 13px; font-weight: 700; }
+  .it-kv-lbl { font-size: 10px; opacity: 0.5; }
+  .it-insight-line { font-size: 11px; opacity: 0.75; margin: 3px 0; line-height: 1.5; }
   .ct-close {
     margin-left: auto; background: none; border: none; color: rgba(255,255,255,0.5);
     font-size: 16px; cursor: pointer; padding: 0 2px; line-height: 1;
@@ -1120,6 +1135,130 @@ function renderKPIs() {
 }
 
 // ── Coverage ──────────────────────────────────────────────────────────────
+// ── Shared tooltip utilities ──────────────────────────────────────────────
+let coverageTooltipData = {};
+let insightTooltipData  = {};
+let _cvTooltipHandlersAttached = false;
+
+function positionAnyTooltip(el, clientX, clientY) {
+  const margin = 8;
+  const vpW = window.innerWidth, vpH = window.innerHeight;
+  const tw = el.offsetWidth, th = el.offsetHeight;
+  let left = clientX + 14, top = clientY - 20;
+  if (left + tw > vpW - margin) left = clientX - tw - 14;
+  if (left < margin)            left = margin;
+  if (top  + th > vpH - margin) top  = vpH - th - margin;
+  if (top  < margin)            top  = margin;
+  el.style.left = left + 'px';
+  el.style.top  = top  + 'px';
+}
+
+function showAnyTooltip(el, html, clientX, clientY, pinned) {
+  el.innerHTML = html;
+  el._pinned = pinned;
+  el.classList.add('visible');
+  positionAnyTooltip(el, clientX, clientY);
+}
+
+function closeBtn(id) {
+  return `<button class="ct-close" onclick="var t=document.getElementById('${id}');t.classList.remove('visible');t._pinned=false;">✕</button>`;
+}
+
+// ── Coverage tooltip builder ───────────────────────────────────────────────
+function buildCoverageTooltip(q) {
+  const { byCloseQ, dealsByCloseQ } = coverageTooltipData;
+  const openVal = byCloseQ[q] || 0;
+  const tgt     = targets[q] || 0;
+  const deals   = (dealsByCloseQ[q] || []).slice().sort((a,b) => b.amount - a.amount);
+  const ratio   = tgt > 0 ? (openVal / tgt) : null;
+  const ratioTxt = ratio !== null ? ratio.toFixed(1) + '×' : '—';
+  const ratioColor = ratio === null ? '#94a3b8' : ratio >= 3 ? '#10b981' : ratio >= 2 ? '#f59e0b' : '#ef4444';
+  const dealRows = deals.map(d => `
+    <div class="ct-row">
+      <span class="ct-deal-name" title="${d.name}">${d.name}</span>
+      <span class="ct-amt">${d.amount ? 'DKK\u00a0' + fmtFull(d.amount) : '—'}</span>
+      <span class="ct-src">${d.source}</span>
+      <span class="ct-date">${d.stage || '—'}</span>
+    </div>`).join('') || '<div style="padding:10px 14px;opacity:0.4">No open deals this quarter</div>';
+  return `
+    <div class="ct-header">
+      <span class="ct-title" style="color:#818cf8">${q} — Open Pipeline</span>
+      ${closeBtn('coverageTooltip')}
+    </div>
+    <div class="ct-stats-bar">
+      <div class="ct-stat-cell">
+        <div class="ct-stat-big" style="color:${ratioColor}">${ratioTxt}</div>
+        <div class="ct-stat-sub">Coverage</div>
+      </div>
+      <div class="ct-stat-cell">
+        <div class="ct-stat-big" style="color:#fbbf24">DKK ${fmtFull(tgt)}</div>
+        <div class="ct-stat-sub">Target</div>
+      </div>
+      <div class="ct-stat-cell">
+        <div class="ct-stat-big" style="color:#818cf8">DKK ${fmtFull(openVal)}</div>
+        <div class="ct-stat-sub">Open Pipeline</div>
+      </div>
+      <div class="ct-stat-cell">
+        <div class="ct-stat-big">${deals.length}</div>
+        <div class="ct-stat-sub">Open Deals</div>
+      </div>
+    </div>
+    <div class="ct-col-hdr">
+      <span>Deal name</span><span style="text-align:right">Amount</span><span>Source</span><span>Stage</span>
+    </div>
+    <div class="ct-body">${dealRows}</div>`;
+}
+
+// ── Insight tooltip builder ────────────────────────────────────────────────
+function buildInsightTooltip(source, rank) {
+  const d = insightTooltipData[source];
+  if (!d) return '';
+  const medals = ['🥇','🥈','🥉','🏅','⭐'];
+  const rankLabels = ['#1 Top Performer','#2 Runner-up','#3 Third Place','#4 Fourth Place','#5 Fifth Place'];
+  const wrColor = d.winRate >= 50 ? '#10b981' : d.winRate >= 30 ? '#f59e0b' : '#ef4444';
+  const totalDeals = d.won + d.lost + d.open;
+  // Build qualitative insights
+  const insights = [];
+  if (d.winRate >= 50) insights.push('🎯 Win rate above 50% — strong closer');
+  else if (d.winRate >= 35) insights.push('✅ Solid win rate — consistent performer');
+  else insights.push('⚠️ Win rate below 35% — room to improve');
+  if (d.won >= 20) insights.push(`📈 ${d.won} wins — highest-volume source`);
+  if (d.avgDealWon > 5000) insights.push(`💰 High-value deals — DKK ${fmt(d.avgDealWon)} avg won`);
+  if (d.open > 0) insights.push(`🔵 ${d.open} deals currently open (DKK ${fmt(d.openVal)})`);
+  if (d.bestDeal > 0) insights.push(`🏆 Best single deal: DKK ${fmtFull(d.bestDeal)}`);
+  return `
+    <div class="ct-header" style="align-items:center">
+      <span style="font-size:11px;opacity:0.5;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">${medals[rank]} ${rankLabels[rank]}</span>
+      ${closeBtn('insightTooltip')}
+    </div>
+    <div style="padding:8px 14px 6px;border-bottom:1px solid rgba(255,255,255,0.1)">
+      <div style="font-size:16px;font-weight:800;margin-bottom:4px">${source}</div>
+      <div style="font-size:11px;opacity:0.55">Score = Won Value × Win Rate &nbsp;→&nbsp; <span style="color:#fbbf24;font-weight:700">DKK ${fmt(d.wonVal)} × ${d.winRate.toFixed(0)}% = ${Math.round(d.score/1000)}k</span></div>
+    </div>
+    <div class="it-section">
+      <div class="it-section-title">Performance</div>
+      <div class="it-grid">
+        <div><div class="it-kv-val" style="color:#10b981">${d.won}W / ${d.lost}L</div><div class="it-kv-lbl">Won / Lost</div></div>
+        <div><div class="it-kv-val" style="color:${wrColor}">${d.winRate.toFixed(0)}%</div><div class="it-kv-lbl">Win rate</div></div>
+        <div><div class="it-kv-val">DKK ${fmt(d.avgDealWon)}</div><div class="it-kv-lbl">Avg won deal</div></div>
+        <div><div class="it-kv-val">${totalDeals}</div><div class="it-kv-lbl">Total deals</div></div>
+      </div>
+    </div>
+    <div class="it-section">
+      <div class="it-section-title">Pipeline</div>
+      <div class="it-grid">
+        <div><div class="it-kv-val" style="color:#818cf8">DKK ${fmt(d.wonVal)}</div><div class="it-kv-lbl">Total won value</div></div>
+        <div><div class="it-kv-val">DKK ${fmt(d.totalPipeline)}</div><div class="it-kv-lbl">Total created</div></div>
+        <div><div class="it-kv-val" style="color:#6ee7b7">DKK ${fmt(d.openVal)}</div><div class="it-kv-lbl">Open pipeline</div></div>
+        <div><div class="it-kv-val" style="color:#fbbf24">DKK ${fmt(d.bestDeal)}</div><div class="it-kv-lbl">Best won deal</div></div>
+      </div>
+    </div>
+    <div class="it-section">
+      <div class="it-section-title">Insights</div>
+      ${insights.map(l=>`<div class="it-insight-line">${l}</div>`).join('')}
+    </div>`;
+}
+
 function renderCoverageChart() {
   readTargets();
   destroyChart('coverage');
@@ -1127,6 +1266,14 @@ function renderCoverageChart() {
   RAW_DEALS.filter(d=>d.isOpen&&d.closeQuarter).forEach(d=>{
     byCloseQ[d.closeQuarter]=(byCloseQ[d.closeQuarter]||0)+d.amount;
   });
+  // Build deal lookup for tooltip
+  const dealsByCloseQ = {};
+  RAW_DEALS.filter(d=>d.isOpen&&d.closeQuarter).forEach(d=>{
+    if(!dealsByCloseQ[d.closeQuarter]) dealsByCloseQ[d.closeQuarter]=[];
+    dealsByCloseQ[d.closeQuarter].push(d);
+  });
+  coverageTooltipData = { byCloseQ, dealsByCloseQ };
+
   const labels=sortQuarters(
     [...new Set([...FUTURE_QUARTERS,...Object.keys(byCloseQ)])]
       .filter(q=>parseInt(q.split(' ')[1])>=getFromYear('fromYr_coverage'))
@@ -1146,11 +1293,55 @@ function renderCoverageChart() {
       {label:'Coverage Ratio',data:labels.map(q=>(targets[q]||0)>0?+((byCloseQ[q]||0)/(targets[q]||0)).toFixed(2):null),type:'line',borderColor:'#10b981',borderWidth:2.5,pointBackgroundColor:'#10b981',pointRadius:5,fill:false,order:0,yAxisID:'y2'}
     ]},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index'},
-      plugins:{legend:{position:'top'},tooltip:{callbacks:{label:ctx=>ctx.dataset.yAxisID==='y2'?` Coverage: ${ctx.raw!==null?ctx.raw.toFixed(2)+'×':'N/A'}`:` ${ctx.dataset.label}: DKK ${fmtFull(ctx.raw)}`}}},
+      plugins:{legend:{position:'top'},tooltip:{enabled:false}},
       scales:{y:{beginAtZero:true,position:'left',ticks:{callback:v=>'DKK '+fmt(v),font:{size:11}},grid:{color:'#f1f5f9'}},
               y2:{beginAtZero:true,position:'right',title:{display:true,text:'Coverage ×',font:{size:11}},ticks:{callback:v=>v+'×',font:{size:11}},grid:{drawOnChartArea:false}},
               x:{ticks:{font:{size:11}}}}}
   });
+
+  // ── Coverage tooltip handlers (attach only once) ──────────────────────
+  if (!_cvTooltipHandlersAttached) {
+    _cvTooltipHandlersAttached = true;
+    const cvCanvas  = document.getElementById('coverageChart');
+    const cvTooltip = document.getElementById('coverageTooltip');
+    let cvHideTimer;
+
+    function cvGetQuarter(e) {
+      if (!charts.coverage) return null;
+      const pts = charts.coverage.getElementsAtEventForMode(e, 'index', {intersect: false}, false);
+      if (!pts.length) return null;
+      return charts.coverage.data.labels[pts[0].index];
+    }
+
+    cvCanvas.addEventListener('mousemove', e => {
+      if (cvTooltip._pinned) return;
+      clearTimeout(cvHideTimer);
+      const q = cvGetQuarter(e);
+      if (!q) { cvHideTimer = setTimeout(()=>{ if(!cvTooltip._pinned) cvTooltip.classList.remove('visible'); }, 80); return; }
+      showAnyTooltip(cvTooltip, buildCoverageTooltip(q), e.clientX, e.clientY, false);
+    });
+    cvCanvas.addEventListener('mouseleave', () => {
+      if (cvTooltip._pinned) return;
+      cvHideTimer = setTimeout(()=>{ if(!cvTooltip._pinned) cvTooltip.classList.remove('visible'); }, 180);
+    });
+    cvTooltip.addEventListener('mouseenter', () => clearTimeout(cvHideTimer));
+    cvTooltip.addEventListener('mouseleave', () => { if (!cvTooltip._pinned) cvTooltip.classList.remove('visible'); });
+
+    cvCanvas.addEventListener('touchstart', e => {
+      const touch = e.touches[0];
+      const fakeEvt = new MouseEvent('mousemove', { clientX: touch.clientX, clientY: touch.clientY });
+      const q = cvGetQuarter(fakeEvt);
+      if (!q) { cvTooltip.classList.remove('visible'); cvTooltip._pinned = false; return; }
+      e.preventDefault();
+      showAnyTooltip(cvTooltip, buildCoverageTooltip(q), touch.clientX, touch.clientY, true);
+    }, { passive: false });
+
+    document.addEventListener('touchstart', e => {
+      if (!cvTooltip._pinned) return;
+      if (!cvTooltip.contains(e.target) && e.target !== cvCanvas)
+        { cvTooltip.classList.remove('visible'); cvTooltip._pinned = false; }
+    });
+  }
 }
 
 // ── Pipeline Generation (combined) ────────────────────────────────────────
@@ -1393,10 +1584,16 @@ function renderInsightBox() {
   RAW_DEALS.forEach(d=>{
     const s=d.source;
     if(s==='Other') return;
-    if(!stats[s]) stats[s]={won:0,lost:0,open:0,wonVal:0};
-    if(d.isClosedWon){stats[s].won++;stats[s].wonVal+=d.amount;}
-    else if(d.isClosedLost) stats[s].lost++;
-    else stats[s].open++;
+    if(!stats[s]) stats[s]={won:0,lost:0,open:0,wonVal:0,openVal:0,totalPipeline:0,bestDeal:0};
+    if(d.isClosedWon){
+      stats[s].won++; stats[s].wonVal+=d.amount;
+      stats[s].totalPipeline+=d.amount;
+      if(d.amount>stats[s].bestDeal) stats[s].bestDeal=d.amount;
+    } else if(d.isClosedLost) {
+      stats[s].lost++; stats[s].totalPipeline+=d.amount;
+    } else {
+      stats[s].open++; stats[s].openVal+=d.amount; stats[s].totalPipeline+=d.amount;
+    }
   });
   // Score = won value × win rate (only sources with ≥5 closed deals)
   const scored = Object.entries(stats)
@@ -1404,7 +1601,10 @@ function renderInsightBox() {
     .map(([source,v])=>{
       const total=v.won+v.lost;
       const wr=v.won/total;
-      return {source,won:v.won,lost:v.lost,open:v.open,wonVal:v.wonVal,winRate:wr*100,score:v.wonVal*wr};
+      return {source,won:v.won,lost:v.lost,open:v.open,wonVal:v.wonVal,
+              openVal:v.openVal,totalPipeline:v.totalPipeline,bestDeal:v.bestDeal,
+              avgDealWon:v.won>0?v.wonVal/v.won:0,
+              winRate:wr*100,score:v.wonVal*wr};
     })
     .sort((a,b)=>b.score-a.score)
     .slice(0,5);
@@ -1413,8 +1613,12 @@ function renderInsightBox() {
   const badgeCls=['badge-gold','badge-silver','badge-bronze','badge-fourth','badge-fifth'];
   const rankLabel=['#1 Top Performer','#2 Runner-up','#3 Third Place','#4 Fourth Place','#5 Fifth Place'];
 
+  // Store enriched stats for tooltip
+  insightTooltipData = {};
+  scored.forEach(r => { insightTooltipData[r.source] = r; });
+
   const cards=scored.map((r,i)=>`
-    <div class="insight-card">
+    <div class="insight-card" data-source="${r.source}" data-rank="${i}" style="cursor:pointer">
       <div class="insight-rank">${medals[i]} ${rankLabel[i]}</div>
       <div class="insight-source">${r.source}</div>
       <div class="insight-stats">
@@ -1438,14 +1642,51 @@ function renderInsightBox() {
       <span class="insight-badge ${badgeCls[i]}" style="margin-left:auto;white-space:nowrap;">Score ${Math.round(r.score/1000)}k</span>
     </div>`).join('');
 
-  document.getElementById('insightBox').innerHTML=`
+  const box = document.getElementById('insightBox');
+  box.innerHTML=`
     <div class="insight-grid">
       <div class="insight-label">
         <h2>🏆 Top 5 Sources</h2>
-        <p style="color:#94a3b8;font-size:12px;">Ranked by won value × win rate</p>
+        <p style="color:#94a3b8;font-size:12px;">Ranked by won value × win rate — hover for details</p>
       </div>
       ${cards}
     </div>`;
+
+  // ── Insight tooltip via event delegation ────────────────────────────────
+  const itTooltip = document.getElementById('insightTooltip');
+  let itHideTimer;
+
+  function itCardFromEvent(e) {
+    return e.target.closest('[data-source]');
+  }
+
+  box.addEventListener('mousemove', e => {
+    if (itTooltip._pinned) return;
+    clearTimeout(itHideTimer);
+    const card = itCardFromEvent(e);
+    if (!card) { itHideTimer = setTimeout(()=>{ if(!itTooltip._pinned) itTooltip.classList.remove('visible'); }, 80); return; }
+    showAnyTooltip(itTooltip, buildInsightTooltip(card.dataset.source, +card.dataset.rank), e.clientX, e.clientY, false);
+  });
+  box.addEventListener('mouseleave', () => {
+    if (itTooltip._pinned) return;
+    itHideTimer = setTimeout(()=>{ if(!itTooltip._pinned) itTooltip.classList.remove('visible'); }, 180);
+  });
+  itTooltip.addEventListener('mouseenter', () => clearTimeout(itHideTimer));
+  itTooltip.addEventListener('mouseleave', () => { if (!itTooltip._pinned) itTooltip.classList.remove('visible'); });
+
+  box.addEventListener('touchstart', e => {
+    const card = itCardFromEvent(e);
+    if (!card) { itTooltip.classList.remove('visible'); itTooltip._pinned = false; return; }
+    e.preventDefault();
+    const touch = e.touches[0];
+    showAnyTooltip(itTooltip, buildInsightTooltip(card.dataset.source, +card.dataset.rank), touch.clientX, touch.clientY, true);
+  }, { passive: false });
+
+  document.addEventListener('touchstart', e => {
+    if (!itTooltip._pinned) return;
+    if (!itTooltip.contains(e.target) && !box.contains(e.target))
+      { itTooltip.classList.remove('visible'); itTooltip._pinned = false; }
+  });
 }
 
 // ── YoY Pipeline Created ──────────────────────────────────────────────────
@@ -1947,5 +2188,7 @@ if (isInIframe() || hasEmbedParam()) {
 document.addEventListener('DOMContentLoaded',init);
 </script>
 <div id="channelTooltip"></div>
+<div id="coverageTooltip"></div>
+<div id="insightTooltip"></div>
 </body>
 </html>
