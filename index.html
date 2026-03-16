@@ -78,10 +78,16 @@
     background: #1a1a2e; color: #f8fafc; border-radius: 10px;
     padding: 0; min-width: 340px; max-width: 480px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.35);
-    font-size: 12px; pointer-events: none;
+    font-size: 12px; pointer-events: auto;
     overflow: hidden;
   }
   #channelTooltip.visible { display: block; }
+  .ct-close {
+    margin-left: auto; background: none; border: none; color: rgba(255,255,255,0.5);
+    font-size: 16px; cursor: pointer; padding: 0 2px; line-height: 1;
+    flex-shrink: 0;
+  }
+  .ct-close:hover { color: #fff; }
   .ct-header {
     padding: 10px 14px 8px;
     border-bottom: 1px solid rgba(255,255,255,0.1);
@@ -313,13 +319,13 @@
   body.embed-mode .kpi-sub   { font-size: 10px; }
   body.embed-mode .kpi-yoy   { font-size: 10px; }
 
-  /* Grid: always single column, tighter */
+  /* Grid: 2 columns on desktop, single column on mobile */
   body.embed-mode .grid {
-    grid-template-columns: 1fr;
-    padding: 0 10px 12px;
-    gap: 10px;
+    grid-template-columns: 1fr 1fr;
+    padding: 0 14px 14px;
+    gap: 12px;
   }
-  body.embed-mode .grid-full { grid-column: 1; }
+  body.embed-mode .grid-full { grid-column: 1 / -1; }
   body.embed-mode .card      { padding: 12px 14px; border-radius: 10px; }
   body.embed-mode .card h2   { font-size: 13px; }
   body.embed-mode .card .subtitle { font-size: 10px; margin-bottom: 8px; }
@@ -384,6 +390,15 @@
   body.embed-mode input[type=text],
   body.embed-mode input[type=number]  { max-width: 100%; }
 
+  /* Tablet / narrow embed: switch to single column */
+  @media (max-width: 700px) {
+    body.embed-mode .grid {
+      grid-template-columns: 1fr;
+      padding: 0 10px 12px;
+      gap: 10px;
+    }
+    body.embed-mode .grid-full { grid-column: 1; }
+  }
   @media (max-width: 540px) {
     body.embed-mode .insight-card {
       flex-direction: column; align-items: flex-start; gap: 6px;
@@ -1759,27 +1774,13 @@ function renderChannelChart() {
     plugins: [pctLabelPlugin]
   });
 
-  // ── Custom HTML hover tooltip ─────────────────────────────────────────
+  // ── Custom HTML hover / touch tooltip ────────────────────────────────────
   const canvas  = ctx.canvas;
   const tooltip = document.getElementById('channelTooltip');
-  const STAGE_CLS = d =>
-    d.isClosedWon ? 'stage-won' : d.isClosedLost ? 'stage-lost' : 'stage-open';
-  const STAGE_LBL = d =>
-    d.isClosedWon ? 'Won' : d.isClosedLost ? d.stage || 'Lost' : d.stage || 'Open';
+  let ttHideTimer = null;
 
-  canvas.addEventListener('mousemove', e => {
-    const pts = charts.channel.getElementsAtEventForMode(e, 'nearest', {intersect: true}, false);
-    if (!pts.length) { tooltip.classList.remove('visible'); return; }
-
-    const {datasetIndex, index} = pts[0];
-    const ch = CHANNELS[datasetIndex];
-    const q  = quarters[index];
-    const key = q + '|' + ch;
-    const deals = dealMap[key] || [];
-    const total = byQ[q]?.[ch] || 0;
-
-    const chColor = {Inbound:'#818cf8', Outbound:'#fbbf24', Partner:'#34d399'}[ch];
-
+  function ctBuildContent(ch, q, deals, total) {
+    const chColor = {Inbound:'#818cf8', Outbound:'#fbbf24', Partner:'#34d399'}[ch] || '#fff';
     const rows = deals.map(d => `
       <div class="ct-row">
         <span class="ct-deal-name" title="${d.name}">${d.name}</span>
@@ -1787,30 +1788,80 @@ function renderChannelChart() {
         <span class="ct-src">${d.source}</span>
         <span class="ct-date">${d.createDate ? d.createDate.split('-').reverse().join('/') : '—'}</span>
       </div>`).join('');
-
-    tooltip.innerHTML = `
+    return `
       <div class="ct-header">
         <span class="ct-title" style="color:${chColor}">${ch} · ${q}</span>
         <span class="ct-total">DKK ${fmtFull(total)} total · ${deals.length} deal${deals.length!==1?'s':''}</span>
+        <button class="ct-close" onclick="var t=document.getElementById('channelTooltip');t.classList.remove('visible');t._pinned=false;">✕</button>
       </div>
       <div class="ct-col-hdr">
         <span>Deal name</span><span style="text-align:right">Amount</span><span>Source</span><span style="text-align:right">Created</span>
       </div>
       <div class="ct-body">${rows}</div>`;
+  }
 
-    // Position tooltip
-    const rect = canvas.getBoundingClientRect();
-    const tx = e.clientX + 14;
-    const ty = e.clientY - 20;
+  function ctPosition(clientX, clientY) {
+    // Clamp tooltip to all 4 viewport edges
+    const margin = 8;
     const vpW = window.innerWidth, vpH = window.innerHeight;
-    tooltip.classList.add('visible');
-    const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
-    tooltip.style.left = (tx + tw > vpW - 10 ? e.clientX - tw - 14 : tx) + 'px';
-    tooltip.style.top  = (ty + th > vpH - 10 ? e.clientY - th + 20  : ty) + 'px';
-  });
+    const tw = tooltip.offsetWidth,  th = tooltip.offsetHeight;
+    let left = clientX + 14;
+    let top  = clientY - 20;
+    if (left + tw > vpW - margin) left = clientX - tw - 14; // flip left
+    if (left < margin)            left = margin;             // clamp left edge
+    if (top  + th > vpH - margin) top  = vpH - th - margin; // clamp bottom
+    if (top  < margin)            top  = margin;             // clamp top
+    tooltip.style.left = left + 'px';
+    tooltip.style.top  = top  + 'px';
+  }
 
+  function ctShow(clientX, clientY, pts, pinned) {
+    if (!pts.length) return;
+    const {datasetIndex, index} = pts[0];
+    const ch = CHANNELS[datasetIndex];
+    const q  = quarters[index];
+    const deals = dealMap[q + '|' + ch] || [];
+    const total = byQ[q]?.[ch] || 0;
+    tooltip.innerHTML = ctBuildContent(ch, q, deals, total);
+    tooltip._pinned = pinned;
+    tooltip.classList.add('visible');
+    ctPosition(clientX, clientY);
+  }
+
+  // ── Desktop: mousemove / mouseleave with hover-over-tooltip support ──────
+  canvas.addEventListener('mousemove', e => {
+    if (tooltip._pinned) return;
+    clearTimeout(ttHideTimer);
+    const pts = charts.channel.getElementsAtEventForMode(e, 'nearest', {intersect: true}, false);
+    if (!pts.length) { ttHideTimer = setTimeout(() => { if (!tooltip._pinned) tooltip.classList.remove('visible'); }, 80); return; }
+    ctShow(e.clientX, e.clientY, pts, false);
+  });
   canvas.addEventListener('mouseleave', () => {
-    tooltip.classList.remove('visible');
+    if (tooltip._pinned) return;
+    ttHideTimer = setTimeout(() => { if (!tooltip._pinned) tooltip.classList.remove('visible'); }, 180);
+  });
+  // Keep tooltip open when mouse moves over it (so user can scroll deal list)
+  tooltip.addEventListener('mouseenter', () => clearTimeout(ttHideTimer));
+  tooltip.addEventListener('mouseleave', () => { if (!tooltip._pinned) tooltip.classList.remove('visible'); });
+
+  // ── Mobile: tap on bar to pin tooltip, tap outside to close ─────────────
+  canvas.addEventListener('touchstart', e => {
+    const touch = e.touches[0];
+    // Build a MouseEvent so Chart.js can find the element
+    const fakeEvt = new MouseEvent('mousemove', { clientX: touch.clientX, clientY: touch.clientY, bubbles: true });
+    const pts = charts.channel.getElementsAtEventForMode(fakeEvt, 'nearest', {intersect: true}, false);
+    if (!pts.length) { tooltip.classList.remove('visible'); tooltip._pinned = false; return; }
+    e.preventDefault(); // prevent page scroll only when a bar is hit
+    ctShow(touch.clientX, touch.clientY, pts, true);
+  }, { passive: false });
+
+  // Tap anywhere outside tooltip to close pinned tooltip
+  document.addEventListener('touchstart', e => {
+    if (!tooltip._pinned) return;
+    if (!tooltip.contains(e.target) && e.target !== canvas) {
+      tooltip.classList.remove('visible');
+      tooltip._pinned = false;
+    }
   });
 }
 
