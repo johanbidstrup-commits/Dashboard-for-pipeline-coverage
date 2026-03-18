@@ -140,6 +140,23 @@
   }
 
   /* ── Global filter bar ── */
+  /* ── Tab bar ── */
+  .tab-bar { display: flex; background: white; border-bottom: 2px solid #e2e8f0; padding: 0 24px; }
+  .tab-btn { padding: 11px 20px; font-size: 13px; font-weight: 600; color: #64748b; background: none; border: none; border-bottom: 3px solid transparent; cursor: pointer; margin-bottom: -2px; transition: color 0.15s, border-color 0.15s; white-space: nowrap; }
+  .tab-btn:hover { color: #374151; }
+  .tab-btn.active { color: #6366f1; border-bottom-color: #6366f1; }
+  body.embed-mode .tab-bar { padding: 0 10px; }
+  body.embed-mode .tab-btn { padding: 8px 14px; font-size: 12px; }
+  /* ── MQL queue table ── */
+  .mql-empty { padding: 20px; text-align: center; color: #94a3b8; font-size: 13px; }
+  .mql-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .mql-table th { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 12px; border-bottom: 2px solid #f1f5f9; text-align: left; white-space: nowrap; }
+  .mql-table td { padding: 10px 12px; border-bottom: 1px solid #f8fafc; vertical-align: middle; }
+  .mql-table tr:last-child td { border-bottom: none; }
+  .mql-table tr:hover td { background: #fafbff; }
+  .mql-badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; background: #ede9fe; color: #6366f1; }
+  .mql-amt { font-weight: 700; color: #6366f1; }
+
   .global-filter-bar {
     background: #1a1a2e; color: white;
     padding: 7px 24px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
@@ -459,6 +476,7 @@
     body.embed-mode .card h2 { font-size: 12px; }
   }
 </style>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -517,6 +535,13 @@
   <button class="btn-update" onclick="updateCharts()">Update Charts</button>
 </div>
 
+
+<div class="tab-bar">
+  <button class="tab-btn active" id="tab-sales" onclick="switchTab('sales')">📊 Salgs Pipeline</button>
+  <button class="tab-btn" id="tab-marketing" onclick="switchTab('marketing')">📣 Marketing Pipeline</button>
+</div>
+
+<div id="salesTab">
 <div class="kpi-bar" id="kpiBar"></div>
 
 <div class="grid">
@@ -679,6 +704,142 @@
 
 </div>
 
+</div><!-- /salesTab -->
+
+<div id="marketingTab" style="display:none">
+  <div class="kpi-bar" id="mktKpiBar"></div>
+  <div class="grid">
+
+    <!-- MQL Lead Queue (full width) -->
+    <div class="card grid-full">
+      <h2>📋 MQL Lead Queue</h2>
+      <p class="subtitle">Deals der afventer salgskvalificering — MQL stage</p>
+      <div id="mqlQueue"></div>
+    </div>
+
+    <!-- Inbound vs Outbound vs Partner -->
+    <div class="card">
+      <h2>Inbound vs Outbound vs Partner — Pipeline by Quarter</h2>
+      <p class="subtitle">Total deal value skabt per kvartal, grupperet efter kanal</p>
+      <div class="chart-local-filter">
+        <label>Show:</label>
+        <select id="mktChShow" onchange="renderMktChannelChart()">
+          <option value="amount">Pipeline created (amount)</option>
+          <option value="count">Number of deals</option>
+        </select>
+        <label>From year:</label>
+        <select id="mktChFrom" onchange="renderMktChannelChart()">
+          <option value="2024">2024</option>
+          <option value="2025" selected>2025</option>
+          <option value="2026">2026</option>
+        </select>
+      </div>
+      <div class="chart-wrap"><canvas id="mktChannelChart"></canvas></div>
+    </div>
+
+    <!-- Inbound Pipeline by Source -->
+    <div class="card">
+      <h2>Inbound Pipeline by Source</h2>
+      <p class="subtitle">Pipeline skabt af marketing-kilder per kvartal</p>
+      <div class="chart-local-filter">
+        <label>From year:</label>
+        <select id="mktSrcFrom" onchange="renderMktSourceChart()">
+          <option value="2024">2024</option>
+          <option value="2025" selected>2025</option>
+          <option value="2026">2026</option>
+        </select>
+      </div>
+      <div class="chart-wrap"><canvas id="mktSourceChart"></canvas></div>
+    </div>
+
+    <!-- Inbound Win Rate by Source -->
+    <div class="card">
+      <h2>Win Rate by Marketing Source</h2>
+      <p class="subtitle">% vundne deals per marketing-kilde (min. 3 lukkede deals)</p>
+      <div id="mktWinRateWrap" style="position:relative"><canvas id="mktWinRateChart"></canvas></div>
+    </div>
+
+    <!-- Inbound Pipeline by Quarter trend -->
+    <div class="card">
+      <h2>Inbound Pipeline by Quarter</h2>
+      <p class="subtitle">Pipeline skabt fra inbound-kilder per kvartal</p>
+      <div class="chart-local-filter">
+        <label>From year:</label>
+        <select id="mktQtrFrom" onchange="renderMktByQuarterChart()">
+          <option value="2024">2024</option>
+          <option value="2025" selected>2025</option>
+          <option value="2026">2026</option>
+        </select>
+      </div>
+      <div class="chart-wrap"><canvas id="mktQtrChart"></canvas></div>
+    </div>
+
+    <!-- Pipeline Velocity -->
+    <div class="card">
+      <h2>Pipeline Velocity by Channel</h2>
+      <p class="subtitle">Estimeret DKK/md per kanal — won deal value × win rate ÷ gns. salgscyklus</p>
+      <div class="chart-wrap"><canvas id="mktVelocityChart"></canvas></div>
+    </div>
+
+    <!-- Google Search Console -->
+    <div class="card grid-full" id="gscCard">
+      <h2>🔍 Google Search Console</h2>
+      <p class="subtitle">Organisk søgetrafik til ekkosoftware.dk fra Google</p>
+      <div id="gscConnectSection">
+        <p style="color:#64748b;font-size:13px;margin-bottom:12px">Forbind Google Search Console for at vise søgedata. Du skal bruge et <strong>Google OAuth 2.0 Client ID</strong> fra <a href="https://console.cloud.google.com/" target="_blank" style="color:#6366f1">Google Cloud Console</a>.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+          <input type="text" id="gscClientId" placeholder="Client ID (xyz.apps.googleusercontent.com)..." style="flex:1;min-width:260px;padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px">
+          <input type="text" id="gscSiteUrl" placeholder="https://ekkosoftware.dk/" value="https://ekkosoftware.dk/" style="width:210px;padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px">
+          <button onclick="gscConnect()" class="gh-btn" style="white-space:nowrap">🔑 Log ind med Google</button>
+        </div>
+        <div id="gscStatus" style="font-size:12px;color:#64748b"></div>
+        <details style="margin-top:12px;font-size:12px;color:#64748b">
+          <summary style="cursor:pointer;color:#6366f1;font-weight:600">Sådan opretter du et Client ID →</summary>
+          <ol style="margin:8px 0 0 16px;line-height:1.8">
+            <li>Gå til <a href="https://console.cloud.google.com/" target="_blank" style="color:#6366f1">console.cloud.google.com</a> og opret/vælg et projekt</li>
+            <li>Aktivér <strong>Google Search Console API</strong> (APIs &amp; Services → Library)</li>
+            <li>Gå til APIs &amp; Services → Credentials → Create Credentials → OAuth client ID</li>
+            <li>Vælg <strong>Web application</strong> og tilføj dashboardets URL under "Authorised JavaScript origins"</li>
+            <li>Kopiér Client ID og indsæt herover</li>
+          </ol>
+        </details>
+      </div>
+      <div id="gscCharts" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+          <span id="gscConnectedAs" style="font-size:13px;color:#64748b"></span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="gscDays" onchange="gscFetch()" style="padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px">
+              <option value="90">Seneste 90 dage</option>
+              <option value="180">Seneste 6 måneder</option>
+              <option value="365" selected>Seneste 12 måneder</option>
+            </select>
+            <button onclick="gscDisconnect()" style="padding:5px 10px;font-size:12px;color:#94a3b8;background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer">Disconnect</button>
+          </div>
+        </div>
+        <div class="grid" style="padding:0;gap:12px">
+          <div class="card" style="margin:0;box-shadow:none;border:1px solid #e2e8f0">
+            <h2 style="font-size:13px">Klik over tid</h2>
+            <div class="chart-wrap" style="height:180px"><canvas id="gscClicksChart"></canvas></div>
+          </div>
+          <div class="card" style="margin:0;box-shadow:none;border:1px solid #e2e8f0">
+            <h2 style="font-size:13px">Impressions over tid</h2>
+            <div class="chart-wrap" style="height:180px"><canvas id="gscImpressionsChart"></canvas></div>
+          </div>
+          <div class="card grid-full" style="margin:0;box-shadow:none;border:1px solid #e2e8f0">
+            <h2 style="font-size:13px">Gennemsnitlig placering i Google (lavere = bedre)</h2>
+            <div class="chart-wrap" style="height:180px"><canvas id="gscPositionChart"></canvas></div>
+          </div>
+          <div class="card grid-full" style="margin:0;box-shadow:none;border:1px solid #e2e8f0">
+            <h2 style="font-size:13px">Top søgeord</h2>
+            <div id="gscQueriesTable"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /marketingTab -->
+
 <script>
 let RAW_DEALS = [{"name": "Joca - New Deal", "amount": 0.0, "source": "Hjælp-til-salg", "stage": "Match afklaret", "createQuarter": "Q1 2026", "createDate": "2026-03-09", "closeQuarter": "Q3 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "CR ELECTRIC AS - New Deal", "amount": 7580.5, "source": "Outbound", "stage": "Match afklaret", "createQuarter": "Q1 2026", "createDate": "2026-03-04", "closeQuarter": "Q3 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Jytas A/S - New Deal", "amount": 3520.0, "source": "Hjælp-til-salg", "stage": "Match afklaret", "createQuarter": "Q1 2026", "createDate": "2026-01-28", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "KAJ BECH A/S - New Deal", "amount": 5878.0, "source": "Paid", "stage": "Match afklaret", "createQuarter": "Q1 2026", "createDate": "2026-01-21", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Weibel installation - New Deal", "amount": 1960.0, "source": "Paid", "stage": "Match afklaret", "createQuarter": "Q1 2026", "createDate": "2026-01-21", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Dragsbæk A/S - New Deal", "amount": 7560.0, "source": "SEO", "stage": "Match afklaret", "createQuarter": "Q1 2026", "createDate": "2026-01-12", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Harper & Vedel - New Deal", "amount": 950.0, "source": "Reference", "stage": "Match afklaret", "createQuarter": "Q1 2026", "createDate": "2026-01-09", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Swietelsky - New Deal", "amount": 5218.0, "source": "Outbound", "stage": "Match afklaret", "createQuarter": "Q1 2026", "createDate": "2026-01-07", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "JANSSON EL A/S - New Deal", "amount": 6440.0, "source": "Paid", "stage": "Match afklaret", "createQuarter": "Q4 2025", "createDate": "2025-12-30", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Juul & Nielsen A/S - New Deal", "amount": 4950.0, "source": "Salgsbrev", "stage": "Match afklaret", "createQuarter": "Q4 2025", "createDate": "2025-12-04", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "FGU Syd- og Vestsjælland - New Deal", "amount": 1500.0, "source": "Reference", "stage": "Match afklaret", "createQuarter": "Q4 2025", "createDate": "2025-12-03", "closeQuarter": "Q3 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Ingeniør Huse A/S - New Deal", "amount": 1225.0, "source": "Reference", "stage": "Match afklaret", "createQuarter": "Q4 2025", "createDate": "2025-10-29", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Frederiksbjerg El - New Deal", "amount": 2205.0, "source": "Salgsbrev", "stage": "Match afklaret", "createQuarter": "Q4 2025", "createDate": "2025-10-16", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "✅ CR EL & TEKNIK - New Deal", "amount": 2680.0, "source": "Reference", "stage": "Match afklaret", "createQuarter": "Q4 2025", "createDate": "2025-10-09", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "NCC - New Deal", "amount": 3049.0, "source": "Reference", "stage": "Match afklaret", "createQuarter": "Q3 2025", "createDate": "2025-09-30", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Tinde Hytter - New Deal", "amount": 3840.0, "source": "We Rock Sales", "stage": "Match afklaret", "createQuarter": "Q3 2025", "createDate": "2025-09-28", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "LOS Gruppen AS - New Deal", "amount": 2700.0, "source": "We Rock Sales", "stage": "Match afklaret", "createQuarter": "Q3 2025", "createDate": "2025-08-29", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Høgh & Sønberg - New Deal", "amount": 4125.0, "source": "Outbound", "stage": "Match afklaret", "createQuarter": "Q3 2025", "createDate": "2025-08-28", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Inwido Denmark A/S - New Deal", "amount": 5299.0, "source": "Hjælp-til-salg", "stage": "Match afklaret", "createQuarter": "Q3 2025", "createDate": "2025-08-20", "closeQuarter": "Q3 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Nordby Maskin - New Deal", "amount": 4800.0, "source": "We Rock Sales", "stage": "Match afklaret", "createQuarter": "Q3 2025", "createDate": "2025-08-14", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "JM Norge AS - New Deal", "amount": 4120.0, "source": "We Rock Sales", "stage": "Match afklaret", "createQuarter": "Q3 2025", "createDate": "2025-08-08", "closeQuarter": "Q3 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "LAB Entreprenør - New Deal", "amount": 2800.0, "source": "We Rock Sales", "stage": "Match afklaret", "createQuarter": "Q3 2025", "createDate": "2025-08-07", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Grunn-Service AS - New Deal", "amount": 3520.0, "source": "We Rock Sales", "stage": "Match afklaret", "createQuarter": "Q3 2025", "createDate": "2025-08-06", "closeQuarter": "Q3 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Dan-alu - New Deal", "amount": 3835.0, "source": "Hjælp-til-salg", "stage": "Match afklaret", "createQuarter": "Q3 2025", "createDate": "2025-08-04", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "ALLAN PLOUG A/S - New Deal", "amount": 3360.0, "source": "Outbound", "stage": "Match afklaret", "createQuarter": "Q2 2025", "createDate": "2025-06-06", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "IBF A/S - New Deal", "amount": 22400.0, "source": "Reference", "stage": "Match afklaret", "createQuarter": "Q2 2025", "createDate": "2025-05-22", "closeQuarter": "Q3 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Nielsen & Søn - New Deal", "amount": 4213.0, "source": "Outbound", "stage": "Match afklaret", "createQuarter": "Q2 2025", "createDate": "2025-05-22", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "DS Gruppen A/S - New Deal", "amount": 6600.0, "source": "Reference", "stage": "Match afklaret", "createQuarter": "Q2 2025", "createDate": "2025-05-15", "closeQuarter": "Q3 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Kastrup Vinduet - New Deal", "amount": 7000.0, "source": "Outbound", "stage": "Match afklaret", "createQuarter": "Q2 2025", "createDate": "2025-05-14", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Leif M. Jensen - New Deal", "amount": 3300.0, "source": "Reference", "stage": "Match afklaret", "createQuarter": "Q2 2025", "createDate": "2025-05-06", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Nilan A/S - New Deal", "amount": 6378.0, "source": "Reference", "stage": "Match afklaret", "createQuarter": "Q4 2024", "createDate": "2024-11-21", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "GoCollective (Arriva) - New Deal", "amount": 5575.0, "source": "Reference", "stage": "Match afklaret", "createQuarter": "Q2 2024", "createDate": "2024-04-18", "closeQuarter": "Q3 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "✅ Vestjyske Net Service - New Deal", "amount": 4950.0, "source": "-", "stage": "Demomøde booket", "createQuarter": "Q1 2026", "createDate": "2026-03-17", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "OTIS A/S - New Deal", "amount": 6312.0, "source": "Outbound", "stage": "Indhent feedback", "createQuarter": "Q1 2026", "createDate": "2026-03-04", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Folkekirken Vesterbro - New Deal", "amount": 1890.0, "source": "SEO", "stage": "Indhent feedback", "createQuarter": "Q1 2026", "createDate": "2026-02-27", "closeQuarter": "Q3 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Caras I/S - New Deal", "amount": 5280.0, "source": "SEO", "stage": "Indhent feedback", "createQuarter": "Q1 2026", "createDate": "2026-02-18", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Byens Bilpleje - New Deal", "amount": 10909.0, "source": "Reference", "stage": "Indhent feedback", "createQuarter": "Q1 2026", "createDate": "2026-02-03", "closeQuarter": "Q4 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "HPH TOTALBYG A/S - New Deal", "amount": 3960.0, "source": "Paid", "stage": "Indhent feedback", "createQuarter": "Q1 2026", "createDate": "2026-01-28", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Nyborg El ApS - New Deal", "amount": 3150.0, "source": "Reference", "stage": "Indhent feedback", "createQuarter": "Q1 2026", "createDate": "2026-01-14", "closeQuarter": "Q3 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Entreprenør Jes Pedersen - New Deal", "amount": 2925.0, "source": "Reference", "stage": "Indhent feedback", "createQuarter": "Q1 2026", "createDate": "2026-01-14", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "ACO Funki A/S - New Deal", "amount": 3465.0, "source": "Hjælp-til-salg", "stage": "Indhent feedback", "createQuarter": "Q4 2025", "createDate": "2025-10-03", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "M&E Engineering - New Deal", "amount": 672.0, "source": "Outbound", "stage": "Indhent feedback", "createQuarter": "Q3 2025", "createDate": "2025-09-29", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Taasinge Elementer - New Deal", "amount": 2475.0, "source": "Hjælp-til-salg", "stage": "Indhent feedback", "createQuarter": "Q3 2025", "createDate": "2025-08-04", "closeQuarter": "Q3 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Zacho-Lind A/S - New Deal", "amount": 4854.0, "source": "Outbound", "stage": "Indhent feedback", "createQuarter": "Q2 2025", "createDate": "2025-06-24", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Thermo-Transit - New Deal", "amount": 4987.5, "source": "Reference", "stage": "Indhent feedback", "createQuarter": "Q2 2025", "createDate": "2025-06-19", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "FP gruppen, Cetonia A/S og FP Alu-Glas A/S. - New Deal", "amount": 3739.0, "source": "Hjælp-til-salg", "stage": "Indhent feedback", "createQuarter": "Q2 2025", "createDate": "2025-06-18", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Finn L. & Davidsen A/S - New Deal", "amount": 6300.0, "source": "Outbound", "stage": "Indhent feedback", "createQuarter": "Q2 2025", "createDate": "2025-05-07", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Zeppelin (CP udlejning) - New Deal", "amount": 2706.0, "source": "SEO", "stage": "Indhent feedback", "createQuarter": "Q1 2025", "createDate": "2025-03-25", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Nordic Powergroup - New Deal", "amount": 2650.0, "source": "1 mill-kampagne", "stage": "Samarbejdsaftale sendt", "createQuarter": "Q1 2026", "createDate": "2026-02-27", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Give Steel A/S - New Deal", "amount": 13698.0, "source": "Reference", "stage": "Samarbejdsaftale sendt", "createQuarter": "Q1 2026", "createDate": "2026-01-21", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "BAD Experten - New Deal", "amount": 432.0, "source": "Salgsbrev", "stage": "Samarbejdsaftale sendt", "createQuarter": "Q4 2025", "createDate": "2025-12-05", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "John Drejer A/S - New Deal", "amount": 1813.0, "source": "Reference", "stage": "Samarbejdsaftale sendt", "createQuarter": "Q4 2025", "createDate": "2025-12-04", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "RGS Nordic - New Deal", "amount": 11250.0, "source": "Reference", "stage": "Samarbejdsaftale sendt", "createQuarter": "Q3 2025", "createDate": "2025-09-16", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Skabertrang - Forsvaret", "amount": 6000.0, "source": "Partner", "stage": "Samarbejdsaftale sendt", "createQuarter": "Q4 2024", "createDate": "2024-12-07", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Byens Tag & Facade - New Deal", "amount": 3400.0, "source": "Reference", "stage": "Samarbejdsaftale sendt", "createQuarter": "Q2 2024", "createDate": "2024-06-27", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Peak Company - Tømrer- og murer Mikael Holck", "amount": 1225.0, "source": "1 mill-kampagne", "stage": "Closed won", "createQuarter": "Q1 2026", "createDate": "2026-03-10", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "H.M. TRÆINDUSTRI ApS - New Deal", "amount": 882.0, "source": "1 mill-kampagne", "stage": "Closed won", "createQuarter": "Q1 2026", "createDate": "2026-02-24", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Tid til ro ApS - New Deal", "amount": 1295.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q1 2026", "createDate": "2026-02-20", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Apj El-Anlæg A/S - New Deal", "amount": 900.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2026", "createDate": "2026-02-19", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Kronjyllands El-Service - New Deal", "amount": 1530.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2026", "createDate": "2026-02-03", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "STV logistik - New Deal", "amount": 1323.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2026", "createDate": "2026-02-03", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Projekt: Slotsparken - Junge Byg A/S - New Deal", "amount": 800.0, "source": "Mer salg til eksist. kunde", "stage": "Closed won", "createQuarter": "Q1 2026", "createDate": "2026-01-21", "closeQuarter": "Q2 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Erik Fals A/S - New Deal", "amount": 2200.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2026", "createDate": "2026-01-16", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Trekantens El Teknik - New Deal", "amount": 784.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q1 2026", "createDate": "2026-01-16", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "PROLINE VVS A/S - New Deal", "amount": 3201.0, "source": "Paid", "stage": "Closed won", "createQuarter": "Q1 2026", "createDate": "2026-01-15", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Mathiassen René, Entreprenør - New Deal", "amount": 1470.0, "source": "Paid", "stage": "Closed won", "createQuarter": "Q1 2026", "createDate": "2026-01-15", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Mia Krone - New Deal", "amount": 591.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2026", "createDate": "2026-01-09", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Intersource - New Deal", "amount": 4269.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q4 2025", "createDate": "2025-12-05", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "STL - New Deal", "amount": 840.0, "source": "Mer salg til eksist. kunde", "stage": "Closed won", "createQuarter": "Q4 2025", "createDate": "2025-11-20", "closeQuarter": "Q4 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Favrskov - New Deal", "amount": 1100.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2025", "createDate": "2025-11-10", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Daikin - New Deal", "amount": 1225.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2025", "createDate": "2025-11-07", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Reconor - Norrecco", "amount": 980.5, "source": "Mer salg til eksist. kunde", "stage": "Closed won", "createQuarter": "Q4 2025", "createDate": "2025-11-06", "closeQuarter": "Q4 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Kaeser Compressors, - New Deal", "amount": 1960.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q4 2025", "createDate": "2025-11-03", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Madsen & Kastberg A/S - New Deal", "amount": 8700.0, "source": "Mer salg til eksist. kunde", "stage": "Closed won", "createQuarter": "Q4 2025", "createDate": "2025-10-31", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "SystemTeknik - New Deal", "amount": 4309.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2025", "createDate": "2025-10-30", "closeQuarter": "Q4 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Dansk Plast A/S - New Deal", "amount": 980.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2025", "createDate": "2025-10-29", "closeQuarter": "Q4 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Trigon, - New Deal", "amount": 2520.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2025", "createDate": "2025-10-23", "closeQuarter": "Q4 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Laur. Christensen og sønner A/S - New Deal", "amount": 2064.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2025", "createDate": "2025-10-22", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Boston (DJI Store Danmark) - New Deal", "amount": 750.0, "source": "Outbound", "stage": "Closed won", "createQuarter": "Q4 2025", "createDate": "2025-10-08", "closeQuarter": "Q4 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Micali El A/S - New Deal", "amount": 3848.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q4 2025", "createDate": "2025-10-07", "closeQuarter": "Q4 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "HNN Byggefirma - New Deal", "amount": 2205.0, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q3 2025", "createDate": "2025-09-18", "closeQuarter": "Q4 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Wicotec Kirkebjerg - New Deal", "amount": 297.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q3 2025", "createDate": "2025-08-28", "closeQuarter": "Q3 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "SAFEWAY - New Deal", "amount": 750.0, "source": "1 mill-kampagne", "stage": "Closed won", "createQuarter": "Q3 2025", "createDate": "2025-08-27", "closeQuarter": "Q3 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Vest-El A/S - New Deal", "amount": 1080.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q3 2025", "createDate": "2025-08-21", "closeQuarter": "Q3 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "WILA - New Deal", "amount": 3278.0, "source": "Outbound", "stage": "Closed won", "createQuarter": "Q3 2025", "createDate": "2025-08-12", "closeQuarter": "Q4 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Hydra-Teknik ApS - New Deal", "amount": 735.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q3 2025", "createDate": "2025-08-12", "closeQuarter": "Q3 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Jysk Byggekompagni - New Deal", "amount": 1667.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q3 2025", "createDate": "2025-07-08", "closeQuarter": "Q3 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "IDEBYG - New Deal", "amount": 3640.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q2 2025", "createDate": "2025-06-27", "closeQuarter": "Q4 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Zøllner - Byggepladsapp", "amount": 1120.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2025", "createDate": "2025-06-26", "closeQuarter": "Q3 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Børge Hansen A/S VVS - New Deal", "amount": 1960.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2025", "createDate": "2025-05-30", "closeQuarter": "Q4 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Visma - New Deal", "amount": 2500.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q2 2025", "createDate": "2025-05-22", "closeQuarter": "Q3 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "EnTech Marine A/S - New Deal", "amount": 2720.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q2 2025", "createDate": "2025-05-21", "closeQuarter": "Q2 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "LCA-elementer - New Deal", "amount": 2198.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2025", "createDate": "2025-05-13", "closeQuarter": "Q2 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Akrusebyg - New Deal", "amount": 304.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q2 2025", "createDate": "2025-05-08", "closeQuarter": "Q2 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Allmsteen Sikring - New Deal", "amount": 1600.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q2 2025", "createDate": "2025-04-18", "closeQuarter": "Q3 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Den grønne mand - New Deal", "amount": 686.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q2 2025", "createDate": "2025-04-10", "closeQuarter": "Q2 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "PLE - New Deal", "amount": 4393.0, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q2 2025", "createDate": "2025-04-10", "closeQuarter": "Q1 2026", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "NÅR - New Deal", "amount": 5432.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2025", "createDate": "2025-04-07", "closeQuarter": "Q2 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Fink Byg ApS - New Deal", "amount": 5418.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q2 2025", "createDate": "2025-04-01", "closeQuarter": "Q4 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "CH VVS A/S - New Deal", "amount": 1627.0, "source": "Outbound", "stage": "Closed won", "createQuarter": "Q1 2025", "createDate": "2025-03-25", "closeQuarter": "Q2 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "HalsnæsSmeden-VVS Vallensbæk - New Deal", "amount": 738.0, "source": "Outbound", "stage": "Closed won", "createQuarter": "Q1 2025", "createDate": "2025-03-13", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Grossisten Gro-inde ApS - New Deal", "amount": 1896.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q1 2025", "createDate": "2025-03-04", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "kjk-krogh.dk - New Deal", "amount": 105.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q1 2025", "createDate": "2025-03-04", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Magnus Haahr Tømrerforretning - New Deal", "amount": 192.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q1 2025", "createDate": "2025-02-20", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Erik Duus A/S - New Deal", "amount": 3430.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q1 2025", "createDate": "2025-02-05", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Wecon Denmark - New Deal", "amount": 918.0, "source": "Outbound", "stage": "Closed won", "createQuarter": "Q1 2025", "createDate": "2025-02-05", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Tømrermester Mads Hyllehøj - New Deal", "amount": 1260.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q1 2025", "createDate": "2025-02-05", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Studsgaard - New Deal", "amount": 2484.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2025", "createDate": "2025-01-22", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Lastas Trucks Danmark A/S - New Deal", "amount": 4518.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q1 2025", "createDate": "2025-01-07", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Byggefirmaet Keld & Johs - New Deal", "amount": 2760.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-12-20", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "City container pt. 2 (moderselskab)", "amount": 2164.5, "source": "Outbound", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-12-13", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "NT Consulting ApS - New Deal", "amount": 750.0, "source": "Outbound", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-12-04", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Aage Jørgensen VVS A/S - New Deal", "amount": 2277.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-11-29", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "sdkfreja.com - New Deal", "amount": 2023.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-11-22", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "H. Nielsen & søn as - New Deal", "amount": 2898.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-11-21", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Norva24 - New Deal", "amount": 5330.0, "source": "Outbound", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-11-13", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Blikkenslagerfirmaet Jesper Hansen Aps - New Deal", "amount": 666.0, "source": "Outbound", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-11-11", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "S. P. JENSEN A/S - New Deal", "amount": 4189.5, "source": "Messe", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-11-11", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "C. MØLLMANN & CO. A/S - New Deal", "amount": 3720.5, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-11-10", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Kristian Rytter A/S - New Deal", "amount": 4783.5, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-11-07", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Pallisgaard A/S - New Deal", "amount": 2835.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-11-04", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Ribe VVS Service A/S - New Deal", "amount": 990.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-10-29", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Ason A/S - New Deal", "amount": 3267.0, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-10-28", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Linkbyg - New Deal", "amount": 60.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-10-17", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Håndværkerne A/S - New Deal", "amount": 826.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-10-11", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Vindunor - New Deal", "amount": 5554.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-10-10", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "VBT A/S - New Deal", "amount": 4669.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q4 2024", "createDate": "2024-10-10", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Lastbilcentralen - New Deal", "amount": 3136.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q3 2024", "createDate": "2024-09-19", "closeQuarter": "Q3 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "El-team vest - New Deal", "amount": 3120.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q3 2024", "createDate": "2024-09-12", "closeQuarter": "Q3 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "SporingsGruppen - New Deal", "amount": 2178.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q3 2024", "createDate": "2024-09-10", "closeQuarter": "Q3 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Vikingbus A/S - New Deal", "amount": 31403.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q3 2024", "createDate": "2024-09-06", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "CJ A/S - New Deal", "amount": 5023.5, "source": "Reference", "stage": "Closed won", "createQuarter": "Q3 2024", "createDate": "2024-09-03", "closeQuarter": "Q2 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "LINDE-EL A/S - New Deal", "amount": 2236.5, "source": "AM-opgradering", "stage": "Closed won", "createQuarter": "Q3 2024", "createDate": "2024-08-29", "closeQuarter": "Q3 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Thyborøn Trawldoor - New Deal", "amount": 3186.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q3 2024", "createDate": "2024-08-27", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Gustav H. Christensen  - New Deal", "amount": 2655.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q3 2024", "createDate": "2024-08-15", "closeQuarter": "Q3 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "FLIB Beton - New Deal", "amount": 413.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q3 2024", "createDate": "2024-07-09", "closeQuarter": "Q3 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Energi Fyn - New Deal", "amount": 2046.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2024", "createDate": "2024-06-29", "closeQuarter": "Q3 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Arla Foods - New Deal", "amount": 8244.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2024", "createDate": "2024-06-12", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Norm Flytning - New Deal", "amount": 1386.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q2 2024", "createDate": "2024-05-29", "closeQuarter": "Q2 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "MSW - New Deal", "amount": 4946.0, "source": "Outbound", "stage": "Closed won", "createQuarter": "Q2 2024", "createDate": "2024-05-20", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "EV Bolig - New Deal", "amount": 1802.0, "source": "Organisk (linkedin)", "stage": "Closed won", "createQuarter": "Q2 2024", "createDate": "2024-05-14", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "2M El-Installation og 2M Bygningsautomatik A/S - New Deal", "amount": 2067.0, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q2 2024", "createDate": "2024-05-03", "closeQuarter": "Q2 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "NemByg A/S - New Deal", "amount": 1779.75, "source": "AM-opgradering", "stage": "Closed won", "createQuarter": "Q2 2024", "createDate": "2024-04-26", "closeQuarter": "Q2 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Lolks Industrial Services - New Deal", "amount": 1715.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q2 2024", "createDate": "2024-04-25", "closeQuarter": "Q3 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Novo Nordisk - New Deal", "amount": 14000.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2024", "createDate": "2024-04-12", "closeQuarter": "Q2 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Munck Gruppen a/s - New Deal", "amount": 24081.75, "source": "Partner", "stage": "Closed won", "createQuarter": "Q2 2024", "createDate": "2024-04-08", "closeQuarter": "Q3 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Kiltin A/S - New Deal", "amount": 3663.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2024", "createDate": "2024-04-04", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "brobergmurer Entreprise ApS - New Deal", "amount": 1386.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-03-27", "closeQuarter": "Q2 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Ole Larsen - New Deal", "amount": 6189.25, "source": "SEO", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-03-26", "closeQuarter": "Q3 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Better Bygningsautomatik - New Deal", "amount": 190.0, "source": "Outbound", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-03-17", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Kronborg Byg - New Deal", "amount": 1470.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-03-13", "closeQuarter": "Q2 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Gartner-Co - New Deal", "amount": 944.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-03-06", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Dankøling - New Deal", "amount": 990.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-03-06", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "KW Betonteknik A/S - New Deal", "amount": 750.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-03-01", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Billeshøj Tømrerforretning ApS - New Deal", "amount": 120.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-03-01", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Elektro-Isola", "amount": 3211.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-02-29", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "LAVUK - New Deal", "amount": 2842.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-02-23", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Fjordbak Byg A/S - New Deal", "amount": 3430.0, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-02-19", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Skou Gruppen A/S - New Deal", "amount": 4063.5, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-02-19", "closeQuarter": "Q2 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "ELINDCO - New Deal", "amount": 6268.5, "source": "Outbound", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-02-14", "closeQuarter": "Q2 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "PHPservice - New Deal", "amount": 6033.0, "source": "Partner", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-02-08", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Brødrene Hedegaard (Aarsleff) - New Deal", "amount": 1183.75, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-02-06", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Fjelsø - New Deal", "amount": 4916.5, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-01-29", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "norplan.dk - New Deal", "amount": 1491.5, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-01-19", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Madsen & Kastberg A/S - New Deal", "amount": 5355.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-01-16", "closeQuarter": "Q2 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Anlægsgartnerfirmaet Dahlgaard - New Deal", "amount": 1881.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-01-12", "closeQuarter": "Q4 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "mobilhome.dk - New Deal", "amount": 6362.5, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-01-03", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Per Aarsleff Sverige  - New Deal", "amount": 3150.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2024", "createDate": "2024-01-02", "closeQuarter": "Q3 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Zøllner - WBS", "amount": 5000.0, "source": "Support", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-12-15", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "ISV Trinava (LS Marketing) - New Deal", "amount": 5289.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-12-13", "closeQuarter": "Q3 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "ringasund.no - New Deal", "amount": 3950.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-12-12", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "MD ANLÆG SJÆLLAND ApS - New Deal", "amount": 1209.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-12-07", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Murerfirmaet Rasmus Jakobsen - New Deal", "amount": 3363.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-12-04", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Stavnskær Elektrik A/S - New Deal", "amount": 2400.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-12-04", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Demskov-El A/S - New Deal", "amount": 2551.5, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-11-15", "closeQuarter": "Q3 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Epcido Group - New Deal", "amount": 5622.5, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-11-09", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "TL Byg A/S - New Deal", "amount": 6766.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-11-06", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "NCC - New Deal", "amount": 1500.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-11-03", "closeQuarter": "Q2 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "SÆTHER - New Deal", "amount": 9891.0, "source": "Messe", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-11-03", "closeQuarter": "Q2 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "VILLY JØNSSON A/S - New Deal", "amount": 300.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-11-03", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "FÆRCH & CO. A/S - New Deal", "amount": 9639.5, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-11-03", "closeQuarter": "Q2 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "SIF Gruppen A/S - New Deal", "amount": 10013.0, "source": "Outbound", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-11-03", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Arkil - New Deal", "amount": 19160.0, "source": "Outbound", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-10-24", "closeQuarter": "Q1 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "toppenberg-hok.dk", "amount": 3953.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-10-19", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Pharma-Cold - New Deal", "amount": 1485.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-10-19", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Mermaid Medical - New Deal", "amount": 4828.0, "source": "Messe", "stage": "Closed won", "createQuarter": "Q4 2023", "createDate": "2023-10-05", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "elsolution.dk - New Deal", "amount": 891.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q3 2023", "createDate": "2023-09-30", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "MTH Arbejdsmiljøapp (Service)", "amount": 29000.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q3 2023", "createDate": "2023-09-20", "closeQuarter": "Q1 2022", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Peder Olsen & Søn A/S - New Deal", "amount": 3593.5, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q3 2023", "createDate": "2023-09-19", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Transportdanmark - New Deal", "amount": 1640.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q3 2023", "createDate": "2023-09-11", "closeQuarter": "Q3 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "ressourceindsamling.dk - New Deal", "amount": 4163.0, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q3 2023", "createDate": "2023-08-29", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Julius-Nielsen.dk - New Deal", "amount": 1332.0, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q3 2023", "createDate": "2023-08-25", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Tømrerfirmaet Sten Jensen a/s - New Deal", "amount": 7693.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q3 2023", "createDate": "2023-08-23", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Veltec Benelux - New Deal", "amount": 5048.0, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q3 2023", "createDate": "2023-08-21", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "HOLSTEBRO TURISTBUSSER ApS - New Deal", "amount": 3510.0, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q3 2023", "createDate": "2023-08-16", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Per Aarsleff A/S - SNM Byggepladsapp", "amount": 154260.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q3 2023", "createDate": "2023-07-14", "closeQuarter": "Q3 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Per Aarsleff Afdeling 125 - New Deal", "amount": 2719.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q3 2023", "createDate": "2023-07-12", "closeQuarter": "Q3 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Hillerød Forsyning - New Deal", "amount": 6229.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q3 2023", "createDate": "2023-07-05", "closeQuarter": "Q4 2025", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "RGS Nordic - New Deal", "amount": 5444.5, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q3 2023", "createDate": "2023-07-05", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "hcsmede - New Deal", "amount": 9700.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2023", "createDate": "2023-06-30", "closeQuarter": "Q3 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Egon Bech - New Deal", "amount": 225.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2023", "createDate": "2023-06-30", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Ole SOMMER A/S - New Deal", "amount": 3634.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2023", "createDate": "2023-06-22", "closeQuarter": "Q2 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Mansoft - New Deal", "amount": 3622.5, "source": "SEO", "stage": "Closed won", "createQuarter": "Q2 2023", "createDate": "2023-05-24", "closeQuarter": "Q3 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Installatorgruppen - New Deal", "amount": 3240.0, "source": "Outbound", "stage": "Closed won", "createQuarter": "Q2 2023", "createDate": "2023-05-24", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Arla Foods - New Deal", "amount": 1822.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2023", "createDate": "2023-05-24", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Bergholdt Jesper, Tømrerfirma APV Onboarding", "amount": 0.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2023", "createDate": "2023-05-24", "closeQuarter": null, "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "APOS Andr. Petersen & Søn - New Deal Onboarding", "amount": 0.0, "source": "Natascha Hansen", "stage": "Closed won", "createQuarter": "Q2 2023", "createDate": "2023-05-24", "closeQuarter": null, "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "APOS Andr. Petersen & Søn - New Deal", "amount": 9780.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2023", "createDate": "2023-05-23", "closeQuarter": "Q2 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Tømrermester Troels Hansen - New Deal", "amount": 5225.0, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q2 2023", "createDate": "2023-05-22", "closeQuarter": "Q3 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Vinduesfabrikken Brønderslev - Arbejdsmiljøapp Onboarding", "amount": 0.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2023", "createDate": "2023-05-17", "closeQuarter": null, "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Opmatic - Medarbejderapp", "amount": 2480.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2023", "createDate": "2023-05-03", "closeQuarter": "Q2 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "EBK Huse - Auto inactive Social script", "amount": 2000.0, "source": "Mer salg til eksist. kunde", "stage": "Closed won", "createQuarter": "Q2 2023", "createDate": "2023-05-03", "closeQuarter": null, "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Nørregard ApS - Arbejdsmiljøapp", "amount": 12840.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q2 2023", "createDate": "2023-05-02", "closeQuarter": "Q2 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Whistleblowersoftware - Frede Andersen & Søn", "amount": 5000.0, "source": "Mer salg til eksist. kunde", "stage": "Closed won", "createQuarter": "Q2 2023", "createDate": "2023-04-25", "closeQuarter": "Q2 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Tømrerfirmaet Vestergaard A/S - Arbejdsmiljøapp", "amount": 9600.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-03-30", "closeQuarter": "Q2 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Btm Byg - Arbejdsmiljøapp", "amount": 9600.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-03-30", "closeQuarter": "Q2 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Brdr Henriksen A/S - New Deal", "amount": 600.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-03-29", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "ROP A/S - Medarbejderapp", "amount": 2239.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-03-17", "closeQuarter": "Q2 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Kimbo Gruppen - Medarbejderapp", "amount": 3468.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-03-10", "closeQuarter": "Q2 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "LOXAM Denmark - APV opsætning", "amount": 6400.0, "source": "Mer salg til eksist. kunde", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-03-06", "closeQuarter": "Q3 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Arne Pedersen A/S - New Deal", "amount": 2000.0, "source": "Mer salg til eksist. kunde", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-02-28", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Bergholdt Jesper, Tømrerfirma APV", "amount": 3000.0, "source": "Mer salg til eksist. kunde", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-02-28", "closeQuarter": "Q2 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Jakon A/S - tilføjelse af datterselskab til tidsregistrering", "amount": 5000.0, "source": "Mer salg til eksist. kunde", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-02-28", "closeQuarter": "Q1 2024", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "IBG A/S - New Deal", "amount": 3584.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-02-27", "closeQuarter": "Q4 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Ncp - Arbejdsmiljøapp", "amount": 10500.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-02-24", "closeQuarter": "Q1 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "H. SKJØDE KNUDSEN A/S - Byggepladsapp - Gartnerbyen", "amount": 35000.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-02-23", "closeQuarter": "Q3 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "MT Højgaard - MTH medarbejderapp", "amount": 7500.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-02-15", "closeQuarter": "Q2 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Tarpgaard - arbejdsmiljøapp", "amount": 16400.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-02-09", "closeQuarter": "Q2 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Ove Jensen A/S - Arbejdsmiljøapp", "amount": 9960.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-02-08", "closeQuarter": "Q1 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Junge Byg - Byggepladsapp", "amount": 11760.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-02-08", "closeQuarter": "Q4 2021", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Søbo - Arbejdsmiljøapp", "amount": 10000.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-02-07", "closeQuarter": "Q1 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Vinduesfabrikken Brønderslev - Arbejdsmiljøapp", "amount": 9600.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-02-05", "closeQuarter": "Q2 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Thomas Andersen - AMapp -> Medarbejderapp (tidsregi)", "amount": 2340.0, "source": "Mer salg til eksist. kunde", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-02-05", "closeQuarter": "Q2 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "AK Service & Vedligehold A/S - medarbejder app", "amount": 4284.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-01-30", "closeQuarter": "Q1 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Zøllner medarbejderapp", "amount": 6778.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2023", "createDate": "2023-01-09", "closeQuarter": "Q1 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "M.I. Montage A/S - Ekko app", "amount": 2029.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2022", "createDate": "2022-12-13", "closeQuarter": "Q1 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Anchersen", "amount": 9609.6, "source": "Reference", "stage": "Closed won", "createQuarter": "Q4 2022", "createDate": "2022-12-07", "closeQuarter": "Q1 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Frede Andersen & Søn", "amount": 7247.5, "source": "Partner", "stage": "Closed won", "createQuarter": "Q4 2022", "createDate": "2022-11-22", "closeQuarter": "Q1 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Høyrup & Clemmensen - Medarbejderapp", "amount": 4933.5, "source": "Salgsbrev", "stage": "Closed won", "createQuarter": "Q3 2022", "createDate": "2022-08-09", "closeQuarter": "Q1 2023", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "Idverde - Medarbejderapp", "amount": 17326.0, "source": "Reference", "stage": "Closed won", "createQuarter": "Q1 2022", "createDate": "2022-03-16", "closeQuarter": "Q3 2022", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "EBK HUSE A/S - Ekko app", "amount": 4858.0, "source": "SEO", "stage": "Closed won", "createQuarter": "Q1 2022", "createDate": "2022-01-12", "closeQuarter": "Q3 2022", "isClosedWon": true, "isClosedLost": false, "isOpen": false}, {"name": "PP Techniq - New Deal", "amount": 480.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2026", "createDate": "2026-02-06", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Myrthue - New Deal", "amount": 1372.0, "source": "1 mill-kampagne", "stage": "Closed lost", "createQuarter": "Q1 2026", "createDate": "2026-01-19", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "PP + EMR", "amount": 6480.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2025", "createDate": "2025-12-19", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "VERDO TEKNIK A/S - New Deal", "amount": 4950.0, "source": "Paid", "stage": "Closed lost", "createQuarter": "Q4 2025", "createDate": "2025-12-19", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Tommysentreprise - New Deal", "amount": 490.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2025", "createDate": "2025-12-10", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "DBT Byg - New Deal", "amount": 2107.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q4 2025", "createDate": "2025-11-07", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "V.S. Larsen A/S - New Deal", "amount": 3150.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2025", "createDate": "2025-11-05", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "FACADEN A/S - New Deal", "amount": 880.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q4 2025", "createDate": "2025-10-30", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Region Hovedstaden - New Deal", "amount": 5880.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2025", "createDate": "2025-10-27", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "LBC-Ängstorp - New Deal", "amount": 2476.5, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2025", "createDate": "2025-10-24", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Med24.dk - New Deal", "amount": 5750.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2025", "createDate": "2025-10-22", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Rejnar Jensen ApS - Tømrer- og snedkerfirma - New Deal", "amount": 392.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q4 2025", "createDate": "2025-10-09", "closeQuarter": "Q3 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "HRL Entreprenør AS - New Deal", "amount": 3520.0, "source": "We Rock Sales", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-09-28", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Burner International - New Deal", "amount": 1035.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-09-23", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Steel Products - New Deal", "amount": 8497.5, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-09-23", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Arwos - New Deal", "amount": 3762.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-09-11", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Kraftmontasje - New Deal", "amount": 3200.0, "source": "We Rock Sales", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-09-04", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "DIS/CREADIS - New Deal", "amount": 14000.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-09-02", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Novafos - New Deal", "amount": 0.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-09-02", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Nordomatic - New Deal", "amount": 20400.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-08-29", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Hans Frisesdahl A/S - New Deal", "amount": 6125.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-08-29", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Ellerup Tømrerforretning - New Deal", "amount": 1960.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-08-28", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "DP ventilation a/s - New Deal", "amount": 2250.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-08-19", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "WaterCare ApS / WaterCare Filtration A/S - New Deal", "amount": 2205.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-08-19", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Volda Maskin - New Deal", "amount": 4425.0, "source": "We Rock Sales", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-08-11", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Park & Anlegg - New Deal", "amount": 5200.0, "source": "We Rock Sales", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-08-04", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Tømrer- og snedkerfirmaet Jeppe Jepsen - New Deal", "amount": 2450.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-07-07", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Ready2Clean - New Deal", "amount": 4290.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q3 2025", "createDate": "2025-07-01", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Svalinn - New Deal", "amount": 3200.0, "source": "We Rock Sales", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-06-29", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Syljuåsen A/S - New Deal", "amount": 6435.0, "source": "We Rock Sales", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-06-29", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "VVS Plan - New Deal", "amount": 980.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-06-26", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "energinet.dk - New Deal", "amount": 1500.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-06-25", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "msmontageaps - New Deal", "amount": 885.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-06-19", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Thorsen & Petersen VVS - New Deal", "amount": 2765.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-06-19", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "BM Byggeindustri - New Deal", "amount": 5949.0, "source": "Hjælp-til-salg", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-06-13", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "MULTI-TECH A/S - New Deal", "amount": 9012.5, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-06-12", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Profox - New Deal", "amount": 3792.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-06-12", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Kjell Pedersen Entreprise A/S - New Deal", "amount": 4071.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-06-12", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Stilling Køl&El - New Deal", "amount": 2925.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-06-12", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Græm byg og anlæg - New Deal", "amount": 15.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-05-30", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "wils.as - New Deal", "amount": 4720.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-05-28", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Give Elementer - New Deal", "amount": 4829.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-05-26", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "dampa ApS - New Deal", "amount": 3942.0, "source": "Hjælp-til-salg", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-05-23", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "P.Lindberg Industri - New Deal", "amount": 3835.0, "source": "Hjælp-til-salg", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-05-23", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "seehusen - New Deal", "amount": 2909.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-05-23", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Arla Foods (Peter Thimm) - New Deal", "amount": 1500.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-05-21", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Ålsrode Smede & Maskinfabrik - New Deal", "amount": 3520.0, "source": "Hjælp-til-salg", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-05-21", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "EBH Byg - New Deal", "amount": 3570.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-05-09", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "ACN Sikring - New Deal", "amount": 1485.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-05-06", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Furesø Kommune - New Deal", "amount": 2730.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-04-30", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "ramudden.dk - New Deal", "amount": 3634.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-04-29", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Søndergaard Nedrivning A/S - New Deal", "amount": 4340.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-04-29", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "NCO BYG AARS A/S - New Deal", "amount": 3312.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-04-16", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Hørkram Foodservice A/S - New Deal", "amount": 11400.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-04-15", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "MSE entreprenør - New Deal", "amount": 3360.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-04-10", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "EUC Nord - New Deal", "amount": 6000.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-04-09", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "PH Montage A/S - New Deal", "amount": 4425.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-04-09", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Makita Danmark - New Deal", "amount": 3960.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2025", "createDate": "2025-04-01", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Trafikinfodk.dk - New Deal", "amount": 595.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-03-28", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "strukton.dk - New Deal", "amount": 2792.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-03-27", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "SPVI - New Deal", "amount": 2500.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-03-19", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "P. Bøgelund A/S - New Deal", "amount": 4736.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-03-17", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "DIN Forsyning - New Deal", "amount": 7905.25, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-03-13", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Samsongruppen - New Deal", "amount": 1090.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-03-12", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "REMONDIS - New Deal", "amount": 6798.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-03-04", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "EWII - New Deal", "amount": 2500.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-02-28", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Magnus Thomsens Efterfølgere - New Deal", "amount": 3450.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-02-26", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "HydraSpecma - New Deal", "amount": 9476.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-02-10", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Nordhavn A/S - New Deal", "amount": 2760.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-02-03", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Danske Stenhuggeri A/S - New Deal", "amount": 8948.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-01-30", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Danpo Farre Deal", "amount": 21505.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-01-29", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Linatech - New Deal", "amount": 555.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-01-28", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Favrskov Forsyning - New Deal", "amount": 2950.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-01-25", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "SystemTeknik - New Deal", "amount": 3994.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-01-24", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Børge Jakobsen & Søn A/S - New Deal", "amount": 4639.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-01-20", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "ARBEJDSMILJØEksperten A/S - New Deal", "amount": 225.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-01-17", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "FL Buur - New Deal", "amount": 1584.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-01-15", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Senior Erhverv Danmark - New Deal", "amount": 28420.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-01-09", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Sørensen Byg - New Deal", "amount": 3560.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-01-06", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "nordicwp.dk - New Deal", "amount": 2415.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2025", "createDate": "2025-01-03", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Dansk Renseri Forening - New Deal", "amount": 6823.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-12-20", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Istak Hf - New Deal", "amount": 8124.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-12-19", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Verdis (Nordic) - New Deal", "amount": 6825.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-12-19", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "tjw-fragt.dk - New Deal", "amount": 3334.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-12-17", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Gug Anlæg - New Deal", "amount": 1180.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-12-17", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "EET - New Deal", "amount": 990.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-12-17", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Tømrerfirmaet Bent Lund A/S - New Deal", "amount": 120.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-12-16", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Milton Huse A/S - New Deal", "amount": 4129.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-12-15", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Daells Bolighus - New Deal", "amount": 1960.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-12-11", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Silkeborg Forsyning - New Deal", "amount": 3975.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-12-10", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Amager Ressourcecenter - New Deal", "amount": 11235.5, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-12-10", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "AutoBude A/S - New Deal", "amount": 3383.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-12-07", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Region Hovedstaden - New Deal", "amount": 6625.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-12-07", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "safiataxa.com - New Deal", "amount": 2832.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-12-02", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Meelunie GPI - New Deal", "amount": 1980.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-12-02", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Murerfirma Niels Bugge ApS - New Deal", "amount": 1980.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-11-28", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Norsyn - New Deal", "amount": 2920.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-11-27", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Eckes-Granini (Rynkeby) - New Deal", "amount": 2000.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-11-25", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "vab.dk - New Deal", "amount": 2800.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-11-20", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "POSTNORD AB - New Deal", "amount": 11000.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-11-14", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Bryde & Sønner A/S - New Deal", "amount": 3450.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-11-06", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Samsongruppen - New Deal", "amount": 2400.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-11-04", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Bornholms Energi & Forsyning - New Deal", "amount": 5575.5, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-11-04", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "3Teknik - New Deal", "amount": 4140.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-10-31", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Entreprenørfirmaet Poul Pedersen A/S - New Deal", "amount": 9310.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-10-22", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Svanerent ApS - New Deal", "amount": 3800.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-10-17", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Copenhagen Airport - New Deal", "amount": 4698.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-10-11", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Almannaverkið - New Deal", "amount": 20100.0, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-10-11", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Dansk Maskin Teknik - New Deal", "amount": 2065.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-10-10", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Vennelyst - New Deal", "amount": 7208.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-10-09", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Fynbo - New Deal", "amount": 4612.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-10-04", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Sejer Pedersen A/S - New Deal", "amount": 6866.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q4 2024", "createDate": "2024-10-03", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "DeLaval - New Deal", "amount": 4129.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-09-23", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "DinBOLI A/S - New Deal", "amount": 2673.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-09-16", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "ReSource - New Deal", "amount": 3762.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-09-16", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Murermester J. Ole Pedersen - New Deal", "amount": 3780.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-09-13", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Strøm Hansen", "amount": 4425.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-09-05", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Duus VVS - New Deal", "amount": 891.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-09-04", "closeQuarter": "Q3 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Poul Schou - New Deal", "amount": 3843.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-09-04", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Artusbyg A/S - New Deal", "amount": 6625.0, "source": "AM-opgradering", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-09-02", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Kasper Nielsen A/S - New Deal", "amount": 2970.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-08-29", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Wanzl - New Deal", "amount": 8874.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-08-22", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Thormann.as - New Deal", "amount": 1950.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-08-21", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "CD-automation - New Deal", "amount": 2070.0, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-08-20", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Kaiser Sport og Ortopædi - New Deal", "amount": 3920.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-08-16", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Erik Lytzen A/S - New Deal", "amount": 5040.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-08-14", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Aunt Betty - New Deal", "amount": 4094.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-07-23", "closeQuarter": "Q3 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Aarsleff Pipe Technologies - Hanna", "amount": 2756.25, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2024", "createDate": "2024-07-08", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Verdo - New Deal", "amount": 7350.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-06-12", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Delta Teknisk Isolering ApS - New Deal", "amount": 400.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-06-12", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Københavns Kommune - New Deal", "amount": 4455.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-06-12", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Viftrup Jespersen A/S - New Deal", "amount": 3540.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-06-10", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Ronald McDonald BørneFond - New Deal", "amount": 350.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-05-29", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "European Tour Production - New Deal", "amount": 840.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-05-29", "closeQuarter": "Q3 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "LINAK - New Deal", "amount": 21125.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-05-29", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Odense Marcipan A/S - New Deal", "amount": 10098.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-05-24", "closeQuarter": "Q3 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Jens Jensen A/S - New Deal", "amount": 3658.0, "source": "AM-opgradering", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-05-22", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Elis Danmark - New Deal", "amount": 10285.5, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-05-20", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Richardt Hansen - New Deal", "amount": 3115.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-05-16", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Børge Jakobsen & Søn A/S - New Deal", "amount": 3625.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-05-15", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Tekum ApS - New Deal", "amount": 3640.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-05-15", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Hovmand A/S - New Deal", "amount": 3248.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-05-08", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "DamGaard Automatik - New Deal", "amount": 1062.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-05-02", "closeQuarter": "Q3 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "ARPE & KJELDSHOLM A/S - New Deal", "amount": 2400.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-04-30", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Mediekompagniet - New Deal", "amount": 675.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-04-30", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Kirkegaard Byggeri - New Deal", "amount": 3835.0, "source": "AM-opgradering", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-04-30", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "JC Tegl & Byg - New Deal", "amount": 1180.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-04-26", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Beas.dk - New Deal", "amount": 1529.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-04-26", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "APC - New Deal", "amount": 2360.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-04-26", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Hans Frisesdahl A/S - New Deal", "amount": 6376.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-04-26", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Strömma Canal Tours - New Deal", "amount": 3843.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-04-23", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "KABI Entreprise - New Deal", "amount": 3245.0, "source": "AM-opgradering", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-04-23", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "AffaldPlus - New Deal", "amount": 8510.5, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-04-23", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "ALLAN PLOUG A/S - New Deal", "amount": 5460.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-04-22", "closeQuarter": "Q3 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "HvidberG a/s - New Deal", "amount": 4383.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-04-19", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "ROCKWOOL - New Deal", "amount": 7500.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-04-15", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Da-Tek - New Deal", "amount": 2376.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2024", "createDate": "2024-04-08", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "GERSTRØM ENTREPRENØR ApS - New Deal", "amount": 4130.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-03-22", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "J. Brock & Søn A/S - New Deal", "amount": 1298.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-03-19", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Kjelkvist A/S - New Deal", "amount": 3948.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-03-12", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Kingo Karlsen A/S - New Deal", "amount": 6079.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-03-12", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Tomagruppen - New Deal", "amount": 3999.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-03-08", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Svend Aage Christiansen A/S - New Deal", "amount": 5670.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-02-29", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Koble - New Deal", "amount": 4875.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-02-28", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "NORDREN AS (Verdis) - New Deal", "amount": 6142.5, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-02-23", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Forenede A/S - New Deal", "amount": 1050.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-02-09", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "BF-Anlæg - New Deal", "amount": 5501.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-02-08", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Løvbjerg - New Deal", "amount": 19600.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-02-06", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Mindspace - New Deal", "amount": 2574.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-02-05", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "DS Stålprofil A/S - New Deal", "amount": 2548.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-01-31", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Harald P/S - New Deal", "amount": 5962.5, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-01-19", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Dansk Sprinkler Teknik - New Deal", "amount": 4032.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-01-18", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Greenpipe A/S - New Deal", "amount": 4005.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-01-12", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Michael Lund A/S - New Deal", "amount": 3738.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q1 2024", "createDate": "2024-01-12", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "BILA A/S - New Deal", "amount": 9261.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-12-18", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "New Deal Kemp & Lauritzen", "amount": 0.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-12-15", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Taastrup FC - New Deal", "amount": 3250.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-12-12", "closeQuarter": "Q3 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Løgismose - New Deal", "amount": 5300.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-12-11", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Lokaltog - New Deal", "amount": 12098.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-12-11", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Helnan International - New Deal", "amount": 4160.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-12-08", "closeQuarter": "Q3 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Munck Gruppen a/s - New Deal", "amount": 0.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-12-06", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Erhvervshus Hovedstaden - New Deal", "amount": 5300.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-12-05", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Kemp & Lauritzen A/S - New Deal", "amount": 0.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-12-05", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Zacho-Lind A/S - New Deal", "amount": 6598.5, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-28", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Taarnby Transport - New Deal", "amount": 2331.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-27", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "JB METALINDUSTRI A/S - New Deal", "amount": 4071.0, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-23", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Vinduesfabrikken Brønderslev A/S  - New Deal", "amount": 4130.0, "source": "Mer salg til eksist. kunde", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-15", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Trekantområdets Brandvæsen - New Deal", "amount": 8575.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-14", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "DECO GROUP AS - New Deal", "amount": 4505.0, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-07", "closeQuarter": "Q3 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "FW Rørteknik - New Deal", "amount": 4350.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-06", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "klaksvik.fo - New Deal", "amount": 7700.0, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-06", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Femern Link Contractors (FLC) - New Deal", "amount": 11000.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-03", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Birk TeQ A/S - New Deal", "amount": 2622.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-03", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "stryhns.dk - New Deal", "amount": 7998.0, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-03", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "GSV - New Deal", "amount": 11375.0, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-03", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Peab Asfalt - New Deal", "amount": 5300.0, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-03", "closeQuarter": "Q3 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "BC Catering - New Deal", "amount": 6500.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-03", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "AB Catering - New Deal", "amount": 11000.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-03", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Preben Jørgensen Huse A/S - New Deal", "amount": 3150.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-11-02", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Harco - New Deal", "amount": 3000.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-10-31", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "3 Danmark - New Deal", "amount": 14000.0, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-10-19", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Akademikernes A-kasse - New Deal", "amount": 6810.5, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-10-19", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "TopTeam - New Deal", "amount": 4130.0, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-10-19", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Meyers - New Deal", "amount": 15924.0, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-10-19", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Vognmandsforretningen Mogens Jensen - New Deal", "amount": 43056.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-10-19", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Acrelec - New Deal", "amount": 4130.0, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-10-19", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "FORBRUGSFORENINGEN AF 1886 - New Deal", "amount": 1975.0, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-10-19", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "ZÜBLIN a/s - New Deal", "amount": 7000.0, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-10-19", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "AltiMaskiner - New Deal", "amount": 990.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-10-19", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Lhg - New Deal", "amount": 2950.0, "source": "Mer salg til eksist. kunde", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-10-19", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Borgautomotive-Group - New Deal", "amount": 4459.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-10-16", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "CD-automation - New Deal", "amount": 2760.0, "source": "Messe", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-10-16", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "CENTRUM PÆLE A/S - New Deal", "amount": 4140.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2023", "createDate": "2023-10-16", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Dehlsen & Sønner - New Deal", "amount": 2346.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-09-22", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "PRO-ELINSTALLATION A/S - New Deal", "amount": 3950.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-09-21", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Pejentreprise - New Deal", "amount": 2010.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-09-18", "closeQuarter": "Q3 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Scania Group - New Deal", "amount": 6300.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-09-14", "closeQuarter": "Q3 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Kirkegaard Byggeri - New Deal", "amount": 5251.0, "source": "Mer salg til eksist. kunde", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-09-12", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Give Steel A/S - New Deal", "amount": 6986.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-09-12", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Norva24 - New Deal", "amount": 6300.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-09-07", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "CUBIC GROUP ApS - New Deal", "amount": 2950.0, "source": "Paid", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-09-04", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Unicon A/S - New Deal", "amount": 9859.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-08-25", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Holsterbro Tømrer og Snedker - New Deal", "amount": 15360.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-08-22", "closeQuarter": null, "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Murermester Jimmy Jacobsen ApS - New Deal", "amount": 990.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-08-18", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Høgh & Sønberg - New Deal", "amount": 4062.5, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-08-18", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Finn L. & Davidsen A/S - New Deal", "amount": 5962.5, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-08-18", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Assens Forsyning A/S - New Deal", "amount": 4140.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-08-10", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "EUROPTEN - New Deal", "amount": 13980.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-08-03", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Trekantens el teknik - New Deal", "amount": 3950.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-13", "closeQuarter": null, "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "DSV Transport A/S - New Deal", "amount": 4129.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-12", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Assens Forsyning A/S - New Deal", "amount": 5300.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-12", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Pankas A/S - New Deal", "amount": 7950.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-12", "closeQuarter": "Q3 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Tide - New Deal", "amount": 16800.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-12", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "SAWO A/S - New Deal", "amount": 7950.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-11", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Aarhus taxa - New Deal", "amount": 13300.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-10", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "olhoff@live.dk - New Deal", "amount": 72000.0, "source": "Organisk (linkedin)", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-05", "closeQuarter": "Q3 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Makenet A/S - New Deal", "amount": 4830.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-05", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Lillegården El - New Deal", "amount": 4590.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-05", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Runøe & Teil - New Deal", "amount": 4761.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-05", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "TLS A/S - New Deal", "amount": 5300.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-05", "closeQuarter": "Q4 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Grh - New Deal", "amount": 6598.5, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-04", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "If Skadeforsikring - New Deal", "amount": 11000.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-04", "closeQuarter": "Q3 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Gentofte Fri for tyveri - Handelsforening - New Deal", "amount": 0.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-03", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "​Bjerregaard og Vigel Pedersen A/S - New Deal", "amount": 3381.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q3 2023", "createDate": "2023-07-01", "closeQuarter": "Q3 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Birger Hansen og Søn + TMByg", "amount": 9600.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-06-19", "closeQuarter": null, "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Danske Bank A/S - New Deal", "amount": 0.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-06-14", "closeQuarter": "Q2 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Hi-Con A/S - New Deal", "amount": 4725.0, "source": "Outbound", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-06-14", "closeQuarter": "Q2 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Trappefabrikken - New Deal", "amount": 1975.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-06-02", "closeQuarter": "Q3 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "kjellerupmureren.dk - New Deal", "amount": 9600.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-05-30", "closeQuarter": "Q2 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Hvidevarer Bornholm - New Deal", "amount": 3795.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-05-26", "closeQuarter": "Q2 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Bgb A.s. - New Deal", "amount": 5300.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-05-24", "closeQuarter": "Q2 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Bgb A.s. - New Deal", "amount": 117930.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-05-24", "closeQuarter": "Q2 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "norlysenergytrading.com - New Deal", "amount": 5300.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-05-24", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Andel - New Deal", "amount": 10500.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-05-24", "closeQuarter": "Q3 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Nissenscoolingsolutions - New Deal", "amount": 5300.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-05-24", "closeQuarter": null, "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "LM Byg A/S - New Deal", "amount": 4032.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-05-24", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "CR ELECTRIC AS - New Deal", "amount": 5300.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-05-24", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "JJ Entreprenør & Anlæg - New Deal", "amount": 60480.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-05-24", "closeQuarter": "Q3 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "VINDELØV BYG ApS - Arbejdsmiljøapp", "amount": 9600.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-05-22", "closeQuarter": null, "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Hovmand VVS Teknik ApS", "amount": 1980.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-05-22", "closeQuarter": "Q2 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Blue Water Shipping", "amount": 10000.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-05-22", "closeQuarter": "Q3 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "DRINX", "amount": 3000.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-05-22", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Richardt Thomsen Erhvervsbyg A/S  - New Deal", "amount": 3950.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q2 2023", "createDate": "2023-05-04", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "MC T - New Deal", "amount": 3450.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-03-28", "closeQuarter": "Q2 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "El-Installator Erik Fals - New Deal", "amount": 2640.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-03-27", "closeQuarter": "Q2 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Stantræk A/S - Medarbejderapp", "amount": 2000.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-03-08", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "TH Mur & Fliser - New Deal", "amount": 4266.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-03-02", "closeQuarter": "Q2 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "2LP A/S - New Deal", "amount": 3950.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-02-27", "closeQuarter": "Q2 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Mad-slagteren.dk I/S - New Deal", "amount": 72000.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-02-23", "closeQuarter": "Q2 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Tømrermester Bo Filtenborg Aps - Medarbejderapp", "amount": 3780.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-02-23", "closeQuarter": "Q3 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Logstrup - New Deal", "amount": 5200.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-02-22", "closeQuarter": "Q3 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "DAN-ELEMENT A/S", "amount": 3950.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-02-17", "closeQuarter": "Q1 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Fri BikeShop", "amount": 450.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-02-15", "closeQuarter": "Q3 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Nordmark - Medarbejderapp", "amount": 3780.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-02-14", "closeQuarter": "Q1 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Laursen Grafisk - Ekko", "amount": 55200.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-02-09", "closeQuarter": "Q2 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "KM Telecom - Ekko", "amount": 4725.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-02-09", "closeQuarter": "Q2 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "DI Teknik - Ekko", "amount": 114906.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-02-09", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "bygma - Ekko", "amount": 13000.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-02-06", "closeQuarter": "Q2 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "DanRoots A/S - New Deal", "amount": 2000.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-01-30", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "DK Roof - Medarbejderapp", "amount": 4000.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q1 2023", "createDate": "2023-01-25", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Skanlux Byggefirma A/S - New Deal", "amount": 2850.0, "source": "Partner", "stage": "Closed lost", "createQuarter": "Q4 2022", "createDate": "2022-12-06", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Trelleborg - New Deal", "amount": 6578.0, "source": "Reference", "stage": "Closed lost", "createQuarter": "Q4 2022", "createDate": "2022-10-20", "closeQuarter": "Q4 2023", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "ELINDCO - New Deal", "amount": 5300.0, "source": "SEO", "stage": "Closed lost", "createQuarter": "Q4 2022", "createDate": "2022-10-13", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "VEM Byg - Ekko app", "amount": 3120.0, "source": "Salgsbrev", "stage": "Closed lost", "createQuarter": "Q1 2022", "createDate": "2022-03-16", "closeQuarter": "Q1 2024", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "VTI - New Deal", "amount": 6600.0, "source": "Reference", "stage": "MQL", "createQuarter": "Q1 2026", "createDate": "2026-03-17", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "At Trives - New Deal", "amount": 0.0, "source": "-", "stage": "MQL", "createQuarter": "Q1 2026", "createDate": "2026-03-17", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Kloster A/S - New Deal", "amount": 6440.0, "source": "-", "stage": "MQL", "createQuarter": "Q1 2026", "createDate": "2026-03-17", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Frode Laursen A/S - New Deal", "amount": 19000.0, "source": "-", "stage": "MQL", "createQuarter": "Q1 2026", "createDate": "2026-03-17", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "ACME Inc.", "amount": 0.0, "source": "Other", "stage": "MQL", "createQuarter": "Q4 2018", "createDate": "2018-11-13", "closeQuarter": null, "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "ARKIL A/S - New Deal", "amount": 8400.0, "source": "Mer salg til eksist. kunde", "stage": "Mere engagement", "createQuarter": "Q1 2026", "createDate": "2026-02-09", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "dpu-entas.dk - New Deal", "amount": 1470.0, "source": "-", "stage": "Mere engagement", "createQuarter": "Q1 2026", "createDate": "2026-01-30", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Ready2Clean - New Deal", "amount": 0.0, "source": "Salgsbrev", "stage": "Mere engagement", "createQuarter": "Q1 2026", "createDate": "2026-01-27", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "JKE Design A/S - New Deal", "amount": 3598.0, "source": "Outbound", "stage": "Mere engagement", "createQuarter": "Q1 2026", "createDate": "2026-01-21", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Herlev Diamanten - New Deal", "amount": 1127.0, "source": "Salgsbrev", "stage": "Mere engagement", "createQuarter": "Q1 2026", "createDate": "2026-01-16", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Ulrik Bisgaard - New Deal", "amount": 1960.0, "source": "Reference", "stage": "Mere engagement", "createQuarter": "Q1 2026", "createDate": "2026-01-07", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Haderslev El-teknik - New Deal", "amount": 528.0, "source": "Partner", "stage": "Mere engagement", "createQuarter": "Q4 2025", "createDate": "2025-12-03", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "System Afspærring - New Deal", "amount": 2700.0, "source": "Reference", "stage": "Mere engagement", "createQuarter": "Q4 2025", "createDate": "2025-11-27", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Thors ejendomsservice - New Deal", "amount": 1225.0, "source": "Salgsbrev", "stage": "Mere engagement", "createQuarter": "Q4 2025", "createDate": "2025-11-04", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Dansand - New Deal", "amount": 2352.0, "source": "Reference", "stage": "Mere engagement", "createQuarter": "Q3 2025", "createDate": "2025-09-19", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "TekniClean - New Deal", "amount": 7280.0, "source": "Outbound", "stage": "Mere engagement", "createQuarter": "Q2 2025", "createDate": "2025-06-17", "closeQuarter": "Q3 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Scan Fish Danmark - New Deal", "amount": 2309.0, "source": "SEO", "stage": "Mere engagement", "createQuarter": "Q2 2025", "createDate": "2025-06-11", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Gibo Plast A/S - New Deal", "amount": 3245.0, "source": "Partner", "stage": "Mere engagement", "createQuarter": "Q1 2025", "createDate": "2025-02-18", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": false, "isOpen": true}, {"name": "Peak Company - Storebælt Anlæg", "amount": 1078.0, "source": "1 mill-kampagne", "stage": "Nyt lead", "createQuarter": "Q1 2026", "createDate": "2026-03-13", "closeQuarter": "Q2 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "VBT A/S - New Deal", "amount": 5500.0, "source": "Outbound", "stage": "Nyt lead", "createQuarter": "Q3 2025", "createDate": "2025-09-23", "closeQuarter": "Q4 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "GASA GROUP - New Deal", "amount": 4200.0, "source": "Partner", "stage": "Aldrig booket demo", "createQuarter": "Q1 2026", "createDate": "2026-03-17", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Nexø Tæpper & Vinyl – Alt til gulvet på Bornholm - New Deal", "amount": 735.0, "source": "SEO", "stage": "Aldrig booket demo", "createQuarter": "Q1 2026", "createDate": "2026-01-14", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "MV group - New Deal", "amount": 1715.0, "source": "Salgsbrev", "stage": "Aldrig booket demo", "createQuarter": "Q4 2025", "createDate": "2025-12-05", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Byggeriets Arbejdsmiljøbus - New Deal", "amount": 352.0, "source": "Partner", "stage": "Aldrig booket demo", "createQuarter": "Q4 2025", "createDate": "2025-12-03", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "SCANGLAS A/S - New Deal", "amount": 4838.0, "source": "Outbound", "stage": "Aldrig booket demo", "createQuarter": "Q3 2025", "createDate": "2025-09-26", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Ardagh Group (Holmegaard) - New Deal", "amount": 0.0, "source": "Reference", "stage": "Aldrig booket demo", "createQuarter": "Q3 2025", "createDate": "2025-09-16", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Kaiser Sport og Ortopædi - New Deal", "amount": 5600.0, "source": "Outbound", "stage": "Aldrig booket demo", "createQuarter": "Q3 2025", "createDate": "2025-09-04", "closeQuarter": "Q1 2026", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Saltfoss - New Deal", "amount": 0.0, "source": "Michael Mollerup Skov", "stage": "Aldrig booket demo", "createQuarter": "Q3 2025", "createDate": "2025-08-29", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Mejsegaarden - New Deal", "amount": 192.0, "source": "SEO", "stage": "Aldrig booket demo", "createQuarter": "Q2 2025", "createDate": "2025-06-20", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Einar Kornerup A/S - New Deal", "amount": 330.0, "source": "Reference", "stage": "Aldrig booket demo", "createQuarter": "Q2 2025", "createDate": "2025-05-19", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Thomas Nørgaard A/S - New Deal", "amount": 4140.0, "source": "Outbound", "stage": "Aldrig booket demo", "createQuarter": "Q2 2025", "createDate": "2025-05-13", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Park Lane Copenhagen - New Deal", "amount": 900.0, "source": "Reference", "stage": "Aldrig booket demo", "createQuarter": "Q2 2025", "createDate": "2025-04-10", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "John Jensen VVS A/S - New Deal", "amount": 0.0, "source": "Outbound", "stage": "Aldrig booket demo", "createQuarter": "Q2 2025", "createDate": "2025-04-02", "closeQuarter": "Q4 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Palle Johansen (Assens Entreprenørforretning A/S) - New Deal", "amount": 0.0, "source": "Michael Mollerup Skov", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-03-18", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Vestas aircoil Deal", "amount": 0.0, "source": "Ole Behnam", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-03-14", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "VMG Vitrex Medical Group Deal", "amount": 0.0, "source": "Ole Behnam", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-03-10", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "CSK Stålindustri A/S - New Deal", "amount": 0.0, "source": "SEO", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-03-05", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "NOVENCO Building & Industry Deal", "amount": 0.0, "source": "Ole Behnam", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-03-03", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Bjarne Larsen - New Deal", "amount": 225.0, "source": "SEO", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-02-25", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Johs. Møllers Maskiner A/S - JMM Group  Deal", "amount": 0.0, "source": "Ole Behnam", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-02-24", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "jss-tomrer.dk - New Deal", "amount": 990.0, "source": "SEO", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-02-20", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Flux A/S Deal", "amount": 0.0, "source": "Ole Behnam", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-02-18", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Nordex-food.dk Deal", "amount": 0.0, "source": "Ole Behnam", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-02-18", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Farumhus - Bageri / Konditori / Café Deal", "amount": 0.0, "source": "Ole Behnam", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-02-17", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Aasted Deal", "amount": 0.0, "source": "Ole Behnam", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-02-17", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Andersen & Martini A/S Deal", "amount": 0.0, "source": "Salgsbrev", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-02-04", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Rengøringsservice Danmark - New Deal", "amount": 0.0, "source": "Reference", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-01-24", "closeQuarter": "Q3 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Tømremester Jacob Pedersen - New Deal", "amount": 180.0, "source": "Partner", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-01-24", "closeQuarter": "Q2 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "Titan Nedbrydning A/S - New Deal", "amount": 0.0, "source": "Reference", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-01-10", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}, {"name": "HOFOR - New Deal", "amount": 4425.0, "source": "Reference", "stage": "Aldrig booket demo", "createQuarter": "Q1 2025", "createDate": "2025-01-07", "closeQuarter": "Q1 2025", "isClosedWon": false, "isClosedLost": true, "isOpen": false}];
 
@@ -828,20 +989,23 @@ function handleCSVUpload(input) {
         `${deals.length} deals · ${won} won · ${open} open`;
 
       // Re-render everything
+      _mktRendered = false;
       renderKPIs();
       renderCoverageChart();
       renderPipelineGenChart();
       renderAvgDealChart();
       renderInsightBox();
       renderYoYPipelineChart();
-  renderChannelChart();
+      renderChannelChart();
       renderWinRateChart();
       renderSourceByQuarterChart();
       renderWonVsTargetChart();
       renderWon2025vsTarget2026Chart();
-      renderChannelChart();
       renderWinRateByQtrChart();
       renderWinRateTable();
+      if (document.getElementById('marketingTab').style.display !== 'none') {
+        renderAllMarketing(); _mktRendered = true;
+      }
 
       status.className = 'upload-status ok';
       status.textContent = `✓ Loaded ${deals.length} deals from "${file.name}"`;
@@ -985,12 +1149,17 @@ async function ghRestoreSnapshot(gistId) {
     const won  = deals.filter(d => d.isClosedWon).length;
     const open = deals.filter(d => d.isOpen).length;
     document.getElementById('lastUpdated').textContent = deals.length + ' deals · ' + won + ' won · ' + open + ' open';
+    _mktRendered = false;
     renderKPIs();
     renderCoverageChart(); renderPipelineGenChart(); renderAvgDealChart();
     renderInsightBox(); renderYoYPipelineChart(); renderChannelChart();
     renderWinRateChart(); renderSourceByQuarterChart();
     renderWonVsTargetChart(); renderWon2025vsTarget2026Chart();
     renderWinRateByQtrChart(); renderWinRateTable();
+    // Re-render marketing if that tab was already opened
+    if (document.getElementById('marketingTab').style.display !== 'none') {
+      renderAllMarketing(); _mktRendered = true;
+    }
     const savedAt = content.savedAt ? new Date(content.savedAt).toLocaleDateString('da-DK') : '?';
     ghSetStatus('✓ Loaded snapshot from ' + savedAt + ' (' + deals.length + ' deals)', 'ok');
     if (select) select.value = '';
@@ -2128,8 +2297,791 @@ function renderChannelChart() {
   });
 }
 
+// ── Marketing Pipeline ─────────────────────────────────────────────────────
+const MKT_SOURCES = ['Reference','SEO','Paid','1 mill-kampagne','AM-opgradering','Organisk (linkedin)','Messe'];
+const MKT_COLORS  = [
+  'rgba(99,102,241,0.82)',
+  'rgba(16,185,129,0.82)',
+  'rgba(245,158,11,0.82)',
+  'rgba(239,68,68,0.82)',
+  'rgba(59,130,246,0.82)',
+  'rgba(168,85,247,0.82)',
+  'rgba(20,184,166,0.82)',
+];
+const MKT_BORDERS = MKT_COLORS.map(c => c.replace('0.82','1'));
+
+let _mktRendered = false;
+
+function switchTab(tab) {
+  document.getElementById('salesTab').style.display      = tab === 'sales'     ? '' : 'none';
+  document.getElementById('marketingTab').style.display  = tab === 'marketing' ? '' : 'none';
+  document.getElementById('tab-sales').classList.toggle('active',     tab === 'sales');
+  document.getElementById('tab-marketing').classList.toggle('active', tab === 'marketing');
+  if (tab === 'marketing') {
+    if (!_mktRendered) { renderAllMarketing(); _mktRendered = true; }
+    // Force chart resize — marketing canvases may have been measured while hidden
+    setTimeout(() => {
+      ['mktChannel','mktSource','mktWinRate','mktQtr','mktVelocity'].forEach(id => {
+        if (charts[id]) charts[id].resize();
+      });
+    }, 50);
+  }
+}
+
+function renderAllMarketing() {
+  renderMarketingKPIs();
+  renderMQLQueue();
+  renderMktChannelChart();
+  renderMktSourceChart();
+  renderMktWinRate();
+  renderMktByQuarterChart();
+  renderPipelineVelocity();
+}
+
+let _mktKpiData = {};
+let _mktKpiHandlersAttached = false;
+
+function attachMktKpiTooltips() {
+  if (_mktKpiHandlersAttached) return;
+  _mktKpiHandlersAttached = true;
+  const bar = document.getElementById('mktKpiBar');
+  const tt  = document.getElementById('mktKpiTooltip');
+  if (!bar || !tt) return;
+
+  function buildMktKpiTooltip(kpi) {
+    const labels = { mql: 'MQL i kø', ibOpen: 'Inbound Open Pipeline', ytd26: 'Pipeline Gen 2026 YTD' };
+    const deals  = (_mktKpiData[kpi] || []).slice().sort((a,b) => b.amount - a.amount);
+    const total  = deals.reduce((s,d) => s + d.amount, 0);
+    const rows   = deals.slice(0, 15).map(d => `
+      <div style="display:grid;grid-template-columns:1fr auto auto;gap:3px 10px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:12px">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.name}">${d.name}</span>
+        <span style="color:#64748b;white-space:nowrap">${d.source || '—'}</span>
+        <span style="font-weight:600;text-align:right;white-space:nowrap">${d.amount ? 'DKK ' + fmtFull(d.amount) : '—'}</span>
+      </div>`).join('');
+    const more = deals.length > 15 ? `<div style="color:#94a3b8;font-size:11px;margin-top:6px">+ ${deals.length - 15} flere deals</div>` : '';
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-weight:700;color:#6366f1;font-size:13px">${labels[kpi]}</span>
+        <button onclick="document.getElementById('mktKpiTooltip').classList.remove('visible');document.getElementById('mktKpiTooltip')._pinned=false" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:16px;line-height:1;padding:0 0 0 8px">✕</button>
+      </div>
+      <div style="color:#64748b;font-size:12px;margin-bottom:8px">${deals.length} deals · DKK ${fmtFull(total)} total</div>
+      <div style="max-height:280px;overflow-y:auto">${rows}${more}</div>`;
+  }
+
+  bar.addEventListener('mouseover', e => {
+    const card = e.target.closest('[data-kpi]');
+    if (!card) { if (!tt._pinned) tt.classList.remove('visible'); return; }
+    tt.innerHTML = buildMktKpiTooltip(card.dataset.kpi);
+    tt._pinned = false;
+    tt.classList.add('visible');
+    positionAnyTooltip(tt, e.clientX, e.clientY);
+  });
+  bar.addEventListener('mousemove', e => {
+    if (tt._pinned) return;
+    const card = e.target.closest('[data-kpi]');
+    if (!card) { tt.classList.remove('visible'); return; }
+    positionAnyTooltip(tt, e.clientX, e.clientY);
+  });
+  bar.addEventListener('mouseleave', () => { if (!tt._pinned) tt.classList.remove('visible'); });
+  tt.addEventListener('mouseenter', () => { /* keep open */ });
+  tt.addEventListener('mouseleave', () => { if (!tt._pinned) tt.classList.remove('visible'); });
+  bar.addEventListener('touchstart', e => {
+    const card = e.target.closest('[data-kpi]');
+    if (!card) return;
+    const touch = e.touches[0];
+    tt.innerHTML = buildMktKpiTooltip(card.dataset.kpi);
+    tt._pinned = true;
+    tt.classList.add('visible');
+    positionAnyTooltip(tt, touch.clientX, touch.clientY);
+  }, { passive: true });
+  document.addEventListener('touchstart', e => {
+    if (!tt._pinned) return;
+    if (!tt.contains(e.target) && !e.target.closest('[data-kpi]')) {
+      tt.classList.remove('visible'); tt._pinned = false;
+    }
+  }, { passive: true });
+}
+
+function renderMarketingKPIs() {
+  const isInbound = d => MKT_SOURCES.includes(d.source);
+  const mql     = RAW_DEALS.filter(d => d.stage === 'MQL');
+  const ibOpen  = RAW_DEALS.filter(d => isInbound(d) && d.isOpen);
+  const ibWon   = RAW_DEALS.filter(d => isInbound(d) && d.isClosedWon);
+  const ibLost  = RAW_DEALS.filter(d => isInbound(d) && d.isClosedLost);
+  const ibOpenVal = ibOpen.reduce((s,d) => s + d.amount, 0);
+  const ibWonVal  = ibWon.reduce((s,d) => s + d.amount, 0);
+  const ibWinRate = (ibWon.length + ibLost.length) > 0
+    ? ibWon.length / (ibWon.length + ibLost.length) * 100 : 0;
+
+  const ytd26 = RAW_DEALS.filter(d => isInbound(d) && d.createDate >= '2026-01-01' && d.createDate <= '2026-03-14');
+  const ytd25 = RAW_DEALS.filter(d => isInbound(d) && d.createDate >= '2025-01-01' && d.createDate <= '2025-03-14');
+  const ytd26Val = ytd26.reduce((s,d) => s + d.amount, 0);
+  const ytd25Val = ytd25.reduce((s,d) => s + d.amount, 0);
+  const yoyDiff  = ytd26Val - ytd25Val;
+  const yoyPct   = ytd25Val > 0 ? (yoyDiff / ytd25Val * 100) : null;
+  const yoyArrow = yoyDiff >= 0 ? '▲' : '▼';
+  const yoyCls   = yoyDiff >= 0 ? 'yoy-up' : 'yoy-down';
+
+  _mktKpiData = { mql, ibOpen, ytd26 };
+
+  document.getElementById('mktKpiBar').innerHTML = `
+    <div class="kpi-card" data-kpi="mql" style="cursor:pointer" title="Hover for deals">
+      <div class="kpi-label">MQL i kø 🔍</div>
+      <div class="kpi-value">${mql.length}</div>
+      <div class="kpi-sub">DKK ${fmt(mql.reduce((s,d) => s+d.amount, 0))} i pipeline</div>
+    </div>
+    <div class="kpi-card" data-kpi="ibOpen" style="cursor:pointer" title="Hover for deals">
+      <div class="kpi-label">Inbound Open Pipeline 🔍</div>
+      <div class="kpi-value">DKK ${fmt(ibOpenVal)}</div>
+      <div class="kpi-sub">${ibOpen.length} aktive deals</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Inbound Win Rate</div>
+      <div class="kpi-value">${ibWinRate.toFixed(0)}%</div>
+      <div class="kpi-sub">${ibWon.length}W / ${ibLost.length}L · DKK ${fmt(ibWonVal)} won</div>
+    </div>
+    <div class="kpi-card" data-kpi="ytd26" style="cursor:pointer" title="Hover for deals">
+      <div class="kpi-label">Inbound Pipeline Gen 2026 (YTD) 🔍</div>
+      <div class="kpi-value">DKK ${fmt(ytd26Val)}</div>
+      <div class="kpi-sub">${ytd26.length} deals · Jan 1 – Mar 14</div>
+      <div class="kpi-yoy">
+        <span class="${yoyCls}">${yoyArrow} ${yoyPct !== null ? Math.abs(yoyPct).toFixed(0) + '%' : '—'}</span>
+        <span class="yoy-label">vs same period 2025 (DKK ${fmt(ytd25Val)})</span>
+      </div>
+    </div>`;
+
+  attachMktKpiTooltips();
+}
+
+function renderMQLQueue() {
+  const mql  = RAW_DEALS.filter(d => d.stage === 'MQL').sort((a,b) => b.amount - a.amount);
+  const wrap = document.getElementById('mqlQueue');
+  if (!mql.length) {
+    wrap.innerHTML = '<p style="color:#94a3b8;font-size:13px;padding:8px 0">Ingen MQL deals i øjeblikket.</p>';
+    return;
+  }
+  const rows = mql.map(d => `
+    <tr>
+      <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9">${d.name}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9"><span class="mql-badge">${d.source || '—'}</span></td>
+      <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:600">DKK ${fmt(d.amount)}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9;color:#64748b">${d.createDate || '—'}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid #f1f5f9;color:#64748b">${d.closeQuarter || '—'}</td>
+    </tr>`).join('');
+  wrap.innerHTML = `
+    <table class="mql-table">
+      <thead>
+        <tr style="background:#f8fafc">
+          <th style="text-align:left;padding:7px 8px;color:#64748b;font-size:11px;text-transform:uppercase;border-bottom:2px solid #e2e8f0">Deal</th>
+          <th style="text-align:left;padding:7px 8px;color:#64748b;font-size:11px;text-transform:uppercase;border-bottom:2px solid #e2e8f0">Kilde</th>
+          <th style="text-align:right;padding:7px 8px;color:#64748b;font-size:11px;text-transform:uppercase;border-bottom:2px solid #e2e8f0">Beløb</th>
+          <th style="text-align:left;padding:7px 8px;color:#64748b;font-size:11px;text-transform:uppercase;border-bottom:2px solid #e2e8f0">Oprettet</th>
+          <th style="text-align:left;padding:7px 8px;color:#64748b;font-size:11px;text-transform:uppercase;border-bottom:2px solid #e2e8f0">Forventet luk</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderMktChannelChart() {
+  destroyChart('mktChannel');
+  const INBOUND_SET = new Set(MKT_SOURCES);
+  const OUTBOUND_SET = new Set(['Salgsbrev','Outbound','We Rock Sales','Hjælp-til-salg']);
+  const PARTNER_SET  = new Set(['Partner']);
+  const CHANNELS = ['Inbound','Outbound','Partner'];
+  function channel(src) {
+    if (INBOUND_SET.has(src))  return 'Inbound';
+    if (OUTBOUND_SET.has(src)) return 'Outbound';
+    if (PARTNER_SET.has(src))  return 'Partner';
+    return null;
+  }
+  const metric = (document.getElementById('mktChShow')||{value:'amount'}).value;
+  const fromYr = parseInt((document.getElementById('mktChFrom')||{value:'2025'}).value) || 2025;
+  const byQ = {}, dealMap = {};
+  RAW_DEALS.forEach(d => {
+    const ch = channel(d.source);
+    if (!ch) return;
+    const q = d.createQuarter;
+    if (!q) return;
+    if (parseInt(q.split(' ')[1]) < fromYr) return;
+    if (!byQ[q]) byQ[q] = {Inbound:0, Outbound:0, Partner:0};
+    byQ[q][ch] += metric === 'amount' ? d.amount : 1;
+    const key = q + '|' + ch;
+    if (!dealMap[key]) dealMap[key] = [];
+    dealMap[key].push(d);
+  });
+  Object.values(dealMap).forEach(arr => arr.sort((a,b) => b.amount - a.amount));
+  const quarters = sortQuarters(Object.keys(byQ));
+  const COLORS = {
+    Inbound:  { bg:'rgba(99,102,241,0.82)', border:'rgba(99,102,241,1)', text:'#818cf8' },
+    Outbound: { bg:'rgba(245,158,11,0.82)', border:'rgba(245,158,11,1)', text:'#fbbf24' },
+    Partner:  { bg:'rgba(16,185,129,0.82)', border:'rgba(16,185,129,1)', text:'#34d399' },
+  };
+
+  const pctLabelPlugin = {
+    id: 'mktPctLabel',
+    afterDatasetsDraw(chart) {
+      const {ctx, data} = chart;
+      data.datasets.forEach((dataset, di) => {
+        const meta = chart.getDatasetMeta(di);
+        if (meta.hidden) return;
+        meta.data.forEach((bar, idx) => {
+          const total = data.datasets.reduce((s, ds, dsi) => {
+            const m = chart.getDatasetMeta(dsi);
+            return m.hidden ? s : s + (ds.data[idx] || 0);
+          }, 0);
+          if (!total || !dataset.data[idx]) return;
+          const pct = Math.round((dataset.data[idx] / total) * 100);
+          if (!pct) return;
+          const barH = bar.base - bar.y;
+          ctx.save();
+          ctx.font = 'bold 10px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          if (barH > 24) {
+            ctx.fillStyle = 'rgba(255,255,255,0.95)';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(pct + '%', bar.x, bar.y + barH / 2);
+          } else if (barH > 6) {
+            ctx.fillStyle = '#374151';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(pct + '%', bar.x, bar.y - 2);
+          }
+          ctx.restore();
+        });
+      });
+    }
+  };
+
+  const ctx = document.getElementById('mktChannelChart').getContext('2d');
+  charts['mktChannel'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: quarters,
+      datasets: CHANNELS.map(ch => ({
+        label: ch,
+        data: quarters.map(q => byQ[q]?.[ch] || 0),
+        backgroundColor: COLORS[ch].bg,
+        borderColor: COLORS[ch].border,
+        borderWidth: 1, borderRadius: 4,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: { enabled: false },
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: {
+          stacked: true, beginAtZero: true,
+          ticks: { callback: v => metric === 'amount' ? 'DKK ' + fmt(v) : v }
+        }
+      }
+    },
+    plugins: [pctLabelPlugin]
+  });
+
+  // ── HTML tooltip (reuses mktChannelTooltip) ──────────────────────────────
+  const mctCanvas  = ctx.canvas;
+  const mctTooltip = document.getElementById('mktChannelTooltip');
+  let mctHideTimer = null;
+
+  function mctBuildContent(ch, q, deals, total, quarterTotal) {
+    const chColor = COLORS[ch]?.text || '#fff';
+    const pct = quarterTotal > 0 ? Math.round(total / quarterTotal * 100) : null;
+    const pctBadge = pct !== null
+      ? `<span style="background:${chColor}22;color:${chColor};font-weight:700;font-size:12px;padding:2px 8px;border-radius:99px;margin-left:4px">${pct}%</span>` : '';
+    const isAmt = metric === 'amount';
+    const rows = deals.map(d => `
+      <div class="ct-row">
+        <span class="ct-deal-name" title="${d.name}">${d.name}</span>
+        <span class="ct-amt">${isAmt && d.amount ? 'DKK ' + fmtFull(d.amount) : '—'}</span>
+        <span class="ct-src">${d.source}</span>
+        <span class="ct-date">${d.createDate ? d.createDate.split('-').reverse().join('/') : '—'}</span>
+      </div>`).join('');
+    return `
+      <div class="ct-header">
+        <span class="ct-title" style="color:${chColor}">${ch} · ${q}</span>${pctBadge}
+        <span class="ct-total">${isAmt ? 'DKK ' + fmtFull(total) + ' · ' : ''}${deals.length} deal${deals.length!==1?'s':''}</span>
+        <button class="ct-close" onclick="var t=document.getElementById('mktChannelTooltip');t.classList.remove('visible');t._pinned=false;">✕</button>
+      </div>
+      <div class="ct-col-hdr">
+        <span>Deal name</span><span style="text-align:right">Amount</span><span>Source</span><span style="text-align:right">Created</span>
+      </div>
+      <div class="ct-body">${rows}</div>`;
+  }
+
+  function mctShow(clientX, clientY, pts, pinned) {
+    if (!pts.length) return;
+    const {datasetIndex, index} = pts[0];
+    const ch = CHANNELS[datasetIndex];
+    const q  = quarters[index];
+    const deals = dealMap[q + '|' + ch] || [];
+    const total = byQ[q]?.[ch] || 0;
+    const quarterTotal = CHANNELS.reduce((s, c) => s + (byQ[q]?.[c] || 0), 0);
+    mctTooltip.innerHTML = mctBuildContent(ch, q, deals, total, quarterTotal);
+    mctTooltip._pinned = pinned;
+    mctTooltip.classList.add('visible');
+    positionAnyTooltip(mctTooltip, clientX, clientY);
+  }
+
+  mctCanvas.addEventListener('mousemove', e => {
+    if (mctTooltip._pinned) return;
+    clearTimeout(mctHideTimer);
+    const pts = charts['mktChannel'].getElementsAtEventForMode(e, 'nearest', {intersect: true}, false);
+    if (!pts.length) { mctHideTimer = setTimeout(() => { if (!mctTooltip._pinned) mctTooltip.classList.remove('visible'); }, 80); return; }
+    mctShow(e.clientX, e.clientY, pts, false);
+  });
+  mctCanvas.addEventListener('mouseleave', () => {
+    if (mctTooltip._pinned) return;
+    mctHideTimer = setTimeout(() => { if (!mctTooltip._pinned) mctTooltip.classList.remove('visible'); }, 180);
+  });
+  mctTooltip.addEventListener('mouseenter', () => clearTimeout(mctHideTimer));
+  mctTooltip.addEventListener('mouseleave', () => { if (!mctTooltip._pinned) mctTooltip.classList.remove('visible'); });
+  mctCanvas.addEventListener('touchstart', e => {
+    const touch = e.touches[0];
+    const fakeEvt = new MouseEvent('mousemove', { clientX: touch.clientX, clientY: touch.clientY, bubbles: true });
+    const pts = charts['mktChannel'].getElementsAtEventForMode(fakeEvt, 'nearest', {intersect: true}, false);
+    if (!pts.length) { mctTooltip.classList.remove('visible'); mctTooltip._pinned = false; return; }
+    e.preventDefault();
+    mctShow(touch.clientX, touch.clientY, pts, true);
+  }, { passive: false });
+  document.addEventListener('touchstart', e => {
+    if (!mctTooltip._pinned) return;
+    if (!mctTooltip.contains(e.target) && e.target !== mctCanvas) {
+      mctTooltip.classList.remove('visible'); mctTooltip._pinned = false;
+    }
+  }, { passive: true });
+}
+
+function renderMktSourceChart() {
+  destroyChart('mktSource');
+  const fromYr = parseInt((document.getElementById('mktSrcFrom')||{value:'2025'}).value) || 2025;
+  const byQ = {};
+  RAW_DEALS.forEach(d => {
+    if (!MKT_SOURCES.includes(d.source)) return;
+    const q = d.createQuarter;
+    if (!q) return;
+    if (parseInt(q.split(' ')[1]) < fromYr) return;
+    if (!byQ[q]) { byQ[q] = {}; MKT_SOURCES.forEach(s => byQ[q][s] = 0); }
+    byQ[q][d.source] = (byQ[q][d.source] || 0) + d.amount;
+  });
+  const quarters = sortQuarters(Object.keys(byQ));
+  const datasets = MKT_SOURCES.map((src, i) => ({
+    label: src,
+    data:  quarters.map(q => byQ[q]?.[src] || 0),
+    backgroundColor: MKT_COLORS[i % MKT_COLORS.length],
+    borderColor:     MKT_BORDERS[i % MKT_BORDERS.length],
+    borderWidth: 1, borderRadius: 4,
+  }));
+  const ctx = document.getElementById('mktSourceChart').getContext('2d');
+  charts['mktSource'] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: quarters, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: { callbacks: { label: c2 => ` ${c2.dataset.label}: DKK ${fmt(c2.raw)}` } }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, ticks: { callback: v => 'DKK ' + fmt(v) } }
+      }
+    }
+  });
+}
+
+function renderMktWinRate() {
+  destroyChart('mktWinRate');
+  const stats = {};
+  MKT_SOURCES.forEach(s => stats[s] = { won:0, lost:0 });
+  RAW_DEALS.forEach(d => {
+    if (!MKT_SOURCES.includes(d.source)) return;
+    if (d.isClosedWon)  stats[d.source].won++;
+    if (d.isClosedLost) stats[d.source].lost++;
+  });
+  // Only include sources with ≥ 3 closed deals; exclude campaign-only sources
+  const WR_EXCLUDED = new Set(['1 mill-kampagne','AM-opgradering']);
+  const rows = MKT_SOURCES.map((src, i) => ({ src, i, ...stats[src] }))
+    .filter(r => r.won + r.lost >= 3 && !WR_EXCLUDED.has(r.src))
+    .map(r => ({ ...r, rate: Math.round(r.won / (r.won + r.lost) * 100) }))
+    .sort((a,b) => b.rate - a.rate);
+
+  if (!rows.length) {
+    document.getElementById('mktWinRateWrap').innerHTML =
+      '<p style="color:#94a3b8;font-size:13px;padding:16px 0 8px">Ikke nok lukkede deals per kilde (min. 3).</p>';
+    return;
+  }
+  // Restore canvas if it was replaced by the "not enough data" message
+  if (!document.getElementById('mktWinRateChart')) {
+    const wrap = document.getElementById('mktWinRateWrap');
+    wrap.innerHTML = '<canvas id="mktWinRateChart"></canvas>';
+  }
+  const ctx = document.getElementById('mktWinRateChart').getContext('2d');
+  charts['mktWinRate'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => r.src),
+      datasets: [{
+        label: 'Win Rate %',
+        data:  rows.map(r => r.rate),
+        backgroundColor: rows.map(r => MKT_COLORS[r.i % MKT_COLORS.length]),
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c2 => {
+              const r = rows[c2.dataIndex];
+              return ` ${c2.raw}%  (${r.won}W / ${r.lost}L)`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { min: 0, max: 100, ticks: { callback: v => v + '%' } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderMktByQuarterChart() {
+  destroyChart('mktQtr');
+  const fromYr = parseInt((document.getElementById('mktQtrFrom')||{value:'2025'}).value) || 2025;
+  const prevYr = fromYr - 1;
+
+  // Build per-Qx maps for current year and previous year
+  const qLabels = ['Q1','Q2','Q3','Q4'];
+  const curData  = {}, prevData = {}, curCnt = {}, prevCnt = {};
+  qLabels.forEach(q => { curData[q]=0; prevData[q]=0; curCnt[q]=0; prevCnt[q]=0; });
+
+  RAW_DEALS.forEach(d => {
+    if (!MKT_SOURCES.includes(d.source)) return;
+    const q = d.createQuarter;
+    if (!q) return;
+    const parts = q.split(' ');
+    const qLabel = parts[0];
+    const yr     = parseInt(parts[1]);
+    if (!qLabels.includes(qLabel)) return;
+    if (yr === fromYr) { curData[qLabel]  += d.amount; curCnt[qLabel]++;  }
+    if (yr === prevYr) { prevData[qLabel] += d.amount; prevCnt[qLabel]++; }
+  });
+
+  const ctx = document.getElementById('mktQtrChart').getContext('2d');
+  charts['mktQtr'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: qLabels,
+      datasets: [
+        {
+          label: String(prevYr) + ' (forrige år)',
+          data:  qLabels.map(q => prevData[q]),
+          backgroundColor: 'rgba(148,163,184,0.6)',
+          borderColor:     'rgba(148,163,184,1)',
+          borderWidth: 1, borderRadius: 4,
+        },
+        {
+          label: String(fromYr) + ' (nuværende)',
+          data:  qLabels.map(q => curData[q]),
+          backgroundColor: 'rgba(99,102,241,0.82)',
+          borderColor:     'rgba(99,102,241,1)',
+          borderWidth: 1, borderRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: c2 => {
+              const isNew = c2.datasetIndex === 1;
+              const cnt   = isNew ? curCnt[qLabels[c2.dataIndex]] : prevCnt[qLabels[c2.dataIndex]];
+              return ` DKK ${fmt(c2.raw)} (${cnt} deals)`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, ticks: { callback: v => 'DKK ' + fmt(v) } }
+      }
+    }
+  });
+}
+
+// ── Pipeline Velocity ─────────────────────────────────────────────────────
+function renderPipelineVelocity() {
+  destroyChart('mktVelocity');
+  const INBOUND_SET2 = new Set(MKT_SOURCES);
+  const OUTBOUND_SET2 = new Set(['Salgsbrev','Outbound','We Rock Sales','Hjælp-til-salg']);
+  const PARTNER_SET2  = new Set(['Partner']);
+  function chFor(src) {
+    if (INBOUND_SET2.has(src))  return 'Inbound';
+    if (OUTBOUND_SET2.has(src)) return 'Outbound';
+    if (PARTNER_SET2.has(src))  return 'Partner';
+    return null;
+  }
+
+  // Per channel: collect won deals with both create and close quarter
+  const chStats = { Inbound: { won:[], lost:0 }, Outbound: { won:[], lost:0 }, Partner: { won:[], lost:0 } };
+  const QN = {Q1:1,Q2:4,Q3:7,Q4:10};
+  function qToMonth(q) {
+    const parts = q.split(' ');
+    return parseInt(parts[1]) * 12 + (QN[parts[0]] || 1);
+  }
+
+  RAW_DEALS.forEach(d => {
+    const ch = chFor(d.source);
+    if (!ch) return;
+    if (d.isClosedWon && d.createQuarter && d.closeQuarter) {
+      const cycle = Math.max(1, (qToMonth(d.closeQuarter) - qToMonth(d.createQuarter)) + 3); // +3 = ~1 quarter min
+      chStats[ch].won.push({ amount: d.amount, cycle });
+    }
+    if (d.isClosedLost) chStats[ch].lost++;
+  });
+
+  const CHANNELS_V = ['Inbound','Outbound','Partner'];
+  const velocities = CHANNELS_V.map(ch => {
+    const { won, lost } = chStats[ch];
+    if (!won.length) return 0;
+    const winRate  = won.length / (won.length + lost) || 0;
+    const avgDeal  = won.reduce((s,w) => s + w.amount, 0) / won.length;
+    const avgCycle = won.reduce((s,w) => s + w.cycle,  0) / won.length; // months
+    return Math.round((won.length * winRate * avgDeal) / avgCycle);
+  });
+
+  const tooltipExtras = CHANNELS_V.map(ch => {
+    const { won, lost } = chStats[ch];
+    if (!won.length) return '—';
+    const winRate  = (won.length / (won.length + lost) * 100).toFixed(0);
+    const avgDeal  = Math.round(won.reduce((s,w) => s + w.amount, 0) / won.length);
+    const avgCycle = (won.reduce((s,w) => s + w.cycle, 0) / won.length).toFixed(1);
+    return `Win rate: ${winRate}% | Gns. deal: DKK ${fmt(avgDeal)} | Gns. cyklus: ${avgCycle} mdr`;
+  });
+
+  const COLORS_V = [
+    { bg:'rgba(99,102,241,0.82)', border:'rgba(99,102,241,1)' },
+    { bg:'rgba(245,158,11,0.82)', border:'rgba(245,158,11,1)' },
+    { bg:'rgba(16,185,129,0.82)', border:'rgba(16,185,129,1)' },
+  ];
+  const canvas = document.getElementById('mktVelocityChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  charts['mktVelocity'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: CHANNELS_V,
+      datasets: [{
+        label: 'Pipeline Velocity (DKK/md)',
+        data:  velocities,
+        backgroundColor: CHANNELS_V.map((_,i) => COLORS_V[i].bg),
+        borderColor:     CHANNELS_V.map((_,i) => COLORS_V[i].border),
+        borderWidth: 1, borderRadius: 6,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c2 => ` DKK ${fmt(c2.raw)} / måned`,
+            afterLabel: c2 => ` ${tooltipExtras[c2.dataIndex]}`,
+          }
+        }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { callback: v => 'DKK ' + fmt(v) } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ── Google Search Console OAuth + Charts ───────────────────────────────────
+let gscToken = '';
+let gscSite  = '';
+
+function gscConnect() {
+  const clientId = (document.getElementById('gscClientId')||{value:''}).value.trim();
+  const siteUrl  = (document.getElementById('gscSiteUrl')||{value:''}).value.trim();
+  if (!clientId) { gscSetStatus('Indsæt dit Google OAuth Client ID', 'err'); return; }
+  if (!siteUrl)  { gscSetStatus('Indsæt dit site URL (fx https://ekkosoftware.dk/)', 'err'); return; }
+  gscSite = siteUrl.replace(/\/+$/, '') + '/';
+  gscSetStatus('Åbner Google login…', '');
+  const tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: 'https://www.googleapis.com/auth/webmasters.readonly',
+    callback: (resp) => {
+      if (resp.error) { gscSetStatus('✗ Login fejlede: ' + resp.error, 'err'); return; }
+      gscToken = resp.access_token;
+      document.getElementById('gscConnectSection').style.display = 'none';
+      document.getElementById('gscCharts').style.display = '';
+      document.getElementById('gscConnectedAs').textContent = '✓ Forbundet til ' + gscSite;
+      gscFetch();
+    }
+  });
+  tokenClient.requestAccessToken();
+}
+
+function gscDisconnect() {
+  gscToken = '';
+  document.getElementById('gscConnectSection').style.display = '';
+  document.getElementById('gscCharts').style.display = 'none';
+  ['gscClicksChart','gscImpressionsChart','gscPositionChart'].forEach(id => destroyChart('gsc_' + id));
+  document.getElementById('gscQueriesTable').innerHTML = '';
+}
+
+function gscSetStatus(msg, type) {
+  const el = document.getElementById('gscStatus');
+  if (el) { el.textContent = msg; el.style.color = type === 'err' ? '#ef4444' : '#64748b'; }
+}
+
+async function gscFetch() {
+  if (!gscToken) return;
+  const days  = parseInt((document.getElementById('gscDays')||{value:'365'}).value) || 365;
+  const endDate   = new Date();
+  const startDate = new Date(); startDate.setDate(endDate.getDate() - days);
+  const fmt8 = d => d.toISOString().slice(0,10);
+
+  const baseBody = {
+    startDate: fmt8(startDate),
+    endDate:   fmt8(endDate),
+    rowLimit:  1000,
+  };
+
+  try {
+    // ── Clicks + Impressions over time ────────────────────────────────────
+    const timeResp = await fetch(
+      \`https://searchconsole.googleapis.com/webmasters/v3/sites/\${encodeURIComponent(gscSite)}/searchAnalytics/query\`,
+      {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + gscToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...baseBody, dimensions: ['date'] })
+      }
+    );
+    if (!timeResp.ok) throw new Error('API fejl: ' + timeResp.status + ' ' + await timeResp.text());
+    const timeData = await timeResp.json();
+    const rows = timeData.rows || [];
+    const dates      = rows.map(r => r.keys[0]);
+    const clicks     = rows.map(r => r.clicks);
+    const impressions = rows.map(r => r.impressions);
+    const positions  = rows.map(r => parseFloat(r.position.toFixed(1)));
+
+    gscRenderTimeChart('gscClicksChart',      dates, clicks,      'Klik',         'rgba(99,102,241,0.82)',  'rgba(99,102,241,1)');
+    gscRenderTimeChart('gscImpressionsChart', dates, impressions, 'Impressions',  'rgba(16,185,129,0.82)',  'rgba(16,185,129,1)');
+    gscRenderPositionChart('gscPositionChart', dates, positions);
+
+    // ── Top queries ───────────────────────────────────────────────────────
+    const qResp = await fetch(
+      \`https://searchconsole.googleapis.com/webmasters/v3/sites/\${encodeURIComponent(gscSite)}/searchAnalytics/query\`,
+      {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + gscToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...baseBody, dimensions: ['query'], rowLimit: 25 })
+      }
+    );
+    const qData = await qResp.json();
+    gscRenderQueriesTable(qData.rows || []);
+
+  } catch(err) {
+    gscSetStatus('✗ ' + err.message, 'err');
+    console.error(err);
+  }
+}
+
+function gscRenderTimeChart(canvasId, labels, data, label, bgColor, borderColor) {
+  const chartKey = 'gsc_' + canvasId;
+  destroyChart(chartKey);
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  charts[chartKey] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{ label, data, backgroundColor: bgColor, borderColor, borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 10 } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function gscRenderPositionChart(canvasId, labels, data) {
+  const chartKey = 'gsc_' + canvasId;
+  destroyChart(chartKey);
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  charts[chartKey] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{ label: 'Gns. placering', data, backgroundColor: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,1)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 10 } }, grid: { display: false } },
+        y: { reverse: true, beginAtZero: false, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function gscRenderQueriesTable(rows) {
+  const wrap = document.getElementById('gscQueriesTable');
+  if (!wrap) return;
+  if (!rows.length) { wrap.innerHTML = '<p style="color:#94a3b8;font-size:13px;padding:8px 0">Ingen søgedata fundet.</p>'; return; }
+  const tableRows = rows.map((r, i) => `
+    <tr style="${i % 2 === 0 ? 'background:#f8fafc' : ''}">
+      <td style="padding:6px 10px;font-size:13px">${r.keys[0]}</td>
+      <td style="padding:6px 10px;text-align:right;font-weight:600;font-size:13px">${r.clicks}</td>
+      <td style="padding:6px 10px;text-align:right;font-size:13px">${r.impressions}</td>
+      <td style="padding:6px 10px;text-align:right;font-size:13px">${(r.ctr * 100).toFixed(1)}%</td>
+      <td style="padding:6px 10px;text-align:right;font-size:13px">${r.position.toFixed(1)}</td>
+    </tr>`).join('');
+  wrap.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="border-bottom:2px solid #e2e8f0">
+          <th style="text-align:left;padding:6px 10px;color:#64748b;font-size:11px;text-transform:uppercase">Søgning</th>
+          <th style="text-align:right;padding:6px 10px;color:#64748b;font-size:11px;text-transform:uppercase">Klik</th>
+          <th style="text-align:right;padding:6px 10px;color:#64748b;font-size:11px;text-transform:uppercase">Impressions</th>
+          <th style="text-align:right;padding:6px 10px;color:#64748b;font-size:11px;text-transform:uppercase">CTR</th>
+          <th style="text-align:right;padding:6px 10px;color:#64748b;font-size:11px;text-transform:uppercase">Placering</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>`;
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────
-function updateCharts(){renderCoverageChart();renderPipelineGenChart();renderAvgDealChart();renderWonVsTargetChart();renderWon2025vsTarget2026Chart();renderWinRateByQtrChart();renderChannelChart();renderSourceByQuarterChart();}
+function updateCharts(){
+  renderCoverageChart();renderPipelineGenChart();renderAvgDealChart();
+  renderWonVsTargetChart();renderWon2025vsTarget2026Chart();renderWinRateByQtrChart();
+  renderChannelChart();renderSourceByQuarterChart();
+  // Re-render marketing tab if it was already opened
+  if (_mktRendered) renderAllMarketing();
+}
 function init(){
   buildTargetInputs();
   renderKPIs();
@@ -2195,5 +3147,7 @@ document.addEventListener('DOMContentLoaded',init);
 <div id="channelTooltip"></div>
 <div id="coverageTooltip"></div>
 <div id="insightTooltip"></div>
+<div id="mktKpiTooltip"></div>
+<div id="mktChannelTooltip"></div>
 </body>
 </html>
