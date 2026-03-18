@@ -73,16 +73,21 @@
   .badge-fifth  { background: #fce7f3; color: #9d174d; }
 
   /* ── Shared dashboard tooltips ── */
-  #channelTooltip, #coverageTooltip, #insightTooltip {
+  #channelTooltip, #coverageTooltip, #insightTooltip,
+  #mktKpiTooltip, #mktChannelTooltip, #mktQtrTooltip {
     display: none; position: fixed; z-index: 9999;
     background: #1a1a2e; color: #f8fafc; border-radius: 10px;
     padding: 0; box-shadow: 0 8px 32px rgba(0,0,0,0.35);
     font-size: 12px; pointer-events: auto; overflow: hidden;
   }
-  #channelTooltip.visible, #coverageTooltip.visible, #insightTooltip.visible { display: block; }
-  #channelTooltip  { min-width: 340px; max-width: 480px; }
-  #coverageTooltip { min-width: 380px; max-width: 520px; }
-  #insightTooltip  { min-width: 300px; max-width: 380px; }
+  #channelTooltip.visible, #coverageTooltip.visible, #insightTooltip.visible,
+  #mktKpiTooltip.visible, #mktChannelTooltip.visible, #mktQtrTooltip.visible { display: block; }
+  #channelTooltip   { min-width: 340px; max-width: 480px; }
+  #coverageTooltip  { min-width: 380px; max-width: 520px; }
+  #insightTooltip   { min-width: 300px; max-width: 380px; }
+  #mktKpiTooltip    { min-width: 380px; max-width: 520px; }
+  #mktChannelTooltip{ min-width: 360px; max-width: 500px; }
+  #mktQtrTooltip    { min-width: 360px; max-width: 500px; }
   /* Coverage stats bar */
   .ct-stats-bar { display: flex; gap: 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
   .ct-stat-cell { flex: 1; padding: 8px 12px; border-right: 1px solid rgba(255,255,255,0.08); }
@@ -555,7 +560,7 @@ async function doLogin() {
 <div class="header">
   <div>
     <h1>📊 Pipeline Dashboard</h1>
-    <p>Coverage, generation &amp; win rate analysis · Data as of March 14, 2026</p>
+    <p id="headerSubtitle">Coverage, generation &amp; win rate analysis · Data as of …</p>
   </div>
   <div class="header-badge" id="lastUpdated">Loading…</div>
 </div>
@@ -799,7 +804,7 @@ async function doLogin() {
           <option value="2026">2026</option>
         </select>
       </div>
-      <div class="chart-wrap"><canvas id="mktChannelChart"></canvas></div>
+      <div class="chart-wrap" style="height:280px"><canvas id="mktChannelChart"></canvas></div>
     </div>
 
     <!-- Inbound Pipeline by Source -->
@@ -821,7 +826,7 @@ async function doLogin() {
     <div class="card">
       <h2>Win Rate by Marketing Source</h2>
       <p class="subtitle">% vundne deals per marketing-kilde (min. 3 lukkede deals)</p>
-      <div id="mktWinRateWrap" style="position:relative"><canvas id="mktWinRateChart"></canvas></div>
+      <div id="mktWinRateWrap" class="chart-wrap" style="position:relative"><canvas id="mktWinRateChart"></canvas></div>
     </div>
 
     <!-- Inbound Pipeline by Quarter trend -->
@@ -836,6 +841,13 @@ async function doLogin() {
       <h2>Pipeline Velocity by Channel</h2>
       <p class="subtitle">Estimeret DKK/md per kanal — won deal value × win rate ÷ gns. salgscyklus</p>
       <div class="chart-wrap"><canvas id="mktVelocityChart"></canvas></div>
+    </div>
+
+    <!-- Pipeline Velocity by Inbound Source -->
+    <div class="card">
+      <h2>Pipeline Velocity by Inbound Source</h2>
+      <p class="subtitle">Estimeret DKK/md per inbound-kilde — won deal value × win rate ÷ gns. salgscyklus</p>
+      <div class="chart-wrap" style="height:240px"><canvas id="mktSrcVelocityChart"></canvas></div>
     </div>
 
 
@@ -987,6 +999,7 @@ function handleCSVUpload(input) {
       // Update header badge
       const won  = deals.filter(d => d.isClosedWon).length;
       const open = deals.filter(d => d.isOpen).length;
+      updateDataDate();
       document.getElementById('lastUpdated').textContent =
         `${deals.length} deals · ${won} won · ${open} open`;
 
@@ -2323,7 +2336,7 @@ function switchTab(tab) {
     if (!_mktRendered) { renderAllMarketing(); _mktRendered = true; }
     // Force chart resize — marketing canvases may have been measured while hidden
     setTimeout(() => {
-      ['mktChannel','mktSource','mktWinRate','mktQtr','mktVelocity'].forEach(id => {
+      ['mktChannel','mktSource','mktWinRate','mktQtr','mktVelocity','mktSrcVelocity'].forEach(id => {
         if (charts[id]) charts[id].resize();
       });
     }, 50);
@@ -2337,6 +2350,7 @@ function renderAllMarketing() {
   renderMktWinRate();
   renderMktByQuarterChart();
   renderPipelineVelocity();
+  renderInboundSourceVelocity();
 }
 
 let _mktKpiData = {};
@@ -2350,23 +2364,35 @@ function attachMktKpiTooltips() {
   if (!bar || !tt) return;
 
   function buildMktKpiTooltip(kpi) {
-    const labels = { mql: 'MQL i kø', ibOpen: 'Inbound Open Pipeline', ytd26: 'Pipeline Gen 2026 YTD' };
+    const titles = { mql: 'MQL i kø', ibOpen: 'Inbound Open Pipeline', ytd26: 'Pipeline Gen 2026 YTD' };
+    const colors = { mql: '#818cf8', ytd26: '#10b981', ibOpen: '#fbbf24' };
     const deals  = (_mktKpiData[kpi] || []).slice().sort((a,b) => b.amount - a.amount);
     const total  = deals.reduce((s,d) => s + d.amount, 0);
-    const rows   = deals.slice(0, 15).map(d => `
-      <div style="display:grid;grid-template-columns:1fr auto auto;gap:3px 10px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:12px">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.name}">${d.name}</span>
-        <span style="color:#64748b;white-space:nowrap">${d.source || '—'}</span>
-        <span style="font-weight:600;text-align:right;white-space:nowrap">${d.amount ? 'DKK ' + fmtFull(d.amount) : '—'}</span>
-      </div>`).join('');
-    const more = deals.length > 15 ? `<div style="color:#94a3b8;font-size:11px;margin-top:6px">+ ${deals.length - 15} flere deals</div>` : '';
-    return `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <span style="font-weight:700;color:#6366f1;font-size:13px">${labels[kpi]}</span>
-        <button onclick="document.getElementById('mktKpiTooltip').classList.remove('visible');document.getElementById('mktKpiTooltip')._pinned=false" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:16px;line-height:1;padding:0 0 0 8px">✕</button>
-      </div>
-      <div style="color:#64748b;font-size:12px;margin-bottom:8px">${deals.length} deals · DKK ${fmtFull(total)} total</div>
-      <div style="max-height:280px;overflow-y:auto">${rows}${more}</div>`;
+    const color  = colors[kpi] || '#818cf8';
+    const dealRows = deals.map(d => {
+      const aC = d.stage === 'MQL' ? '#818cf8' : '#10b981';
+      return '<div class="ct-row">' +
+      '<span class="ct-deal-name" title="' + d.name + '">' + d.name + '</span>' +
+      '<span class="ct-amt" style="color:' + aC + '">' + (d.amount ? 'DKK ' + fmtFull(d.amount) : '—') + '</span>' +
+      '<span class="ct-src">' + (d.source || '—') + '</span>' +
+      '</div>';
+    }).join('') || '<div style="padding:10px 14px;opacity:0.4">Ingen deals</div>';
+    return '<div class="ct-header">' +
+      '<span class="ct-title" style="color:' + color + '">' + titles[kpi] + '</span>' +
+      closeBtn('mktKpiTooltip') +
+      '</div>' +
+      '<div class="ct-stats-bar">' +
+        '<div class="ct-stat-cell">' +
+          '<div class="ct-stat-big" style="color:' + color + '">' + deals.length + '</div>' +
+          '<div class="ct-stat-sub">Deals</div>' +
+        '</div>' +
+        '<div class="ct-stat-cell">' +
+          '<div class="ct-stat-big" style="color:#fbbf24">DKK ' + fmtFull(total) + '</div>' +
+          '<div class="ct-stat-sub">Total pipeline</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ct-col-hdr"><span>Deal name</span><span style="text-align:right">Amount</span><span>Source</span><span></span></div>' +
+      '<div class="ct-body">' + dealRows + '</div>';
   }
 
   bar.addEventListener('mouseover', e => {
@@ -2384,6 +2410,17 @@ function attachMktKpiTooltips() {
     positionAnyTooltip(tt, e.clientX, e.clientY);
   });
   bar.addEventListener('mouseleave', () => { if (!tt._pinned) tt.classList.remove('visible'); });
+  bar.addEventListener('click', e => {
+    const card = e.target.closest('[data-kpi]');
+    if (!card) return;
+    tt.innerHTML = buildMktKpiTooltip(card.dataset.kpi);
+    tt._pinned = true; tt.classList.add('visible');
+    positionAnyTooltip(tt, e.clientX, e.clientY);
+  });
+  document.addEventListener('click', e => {
+    if (!tt._pinned) return;
+    if (!tt.contains(e.target) && !e.target.closest('[data-kpi]')) { tt.classList.remove('visible'); tt._pinned = false; }
+  });
   tt.addEventListener('mouseenter', () => { /* keep open */ });
   tt.addEventListener('mouseleave', () => { if (!tt._pinned) tt.classList.remove('visible'); });
   bar.addEventListener('touchstart', e => {
@@ -2426,6 +2463,11 @@ function renderMarketingKPIs() {
   _mktKpiData = { mql, ibOpen, ytd26 };
 
   document.getElementById('mktKpiBar').innerHTML = `
+    <div class="kpi-card" data-kpi="mql" style="cursor:pointer" title="Hover for deals">
+      <div class="kpi-label">MQL i kø 🔍</div>
+      <div class="kpi-value">${mql.length}</div>
+      <div class="kpi-sub">DKK ${fmt(mql.reduce((s,d) => s+d.amount, 0))} i pipeline</div>
+    </div>
     <div class="kpi-card">
       <div class="kpi-label">Inbound Win Rate</div>
       <div class="kpi-value">${ibWinRate.toFixed(0)}%</div>
@@ -2510,6 +2552,36 @@ function renderMktChannelChart() {
   };
 
   const ctx = document.getElementById('mktChannelChart').getContext('2d');
+
+  const mktChPctPlugin = {
+    id: 'mktChPct',
+    afterDatasetsDraw(chart) {
+      const {ctx: c, data} = chart;
+      data.datasets.forEach((dataset, di) => {
+        const meta = chart.getDatasetMeta(di);
+        if (meta.hidden) return;
+        meta.data.forEach((bar, idx) => {
+          const val = dataset.data[idx] || 0;
+          if (!val) return;
+          const total = data.datasets.reduce((s, ds, dsi) => {
+            const m = chart.getDatasetMeta(dsi);
+            return m.hidden ? s : s + (ds.data[idx] || 0);
+          }, 0);
+          if (!total) return;
+          const pct = Math.round(val / total * 100);
+          if (!pct) return;
+          c.save();
+          c.font = 'bold 10px system-ui, sans-serif';
+          c.fillStyle = '#374151';
+          c.textAlign = 'center';
+          c.textBaseline = 'bottom';
+          c.fillText(pct + '%', bar.x, bar.y - 2);
+          c.restore();
+        });
+      });
+    }
+  };
+
   charts['mktChannel'] = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -2535,7 +2607,8 @@ function renderMktChannelChart() {
           ticks: { callback: v => metric === 'amount' ? 'DKK ' + fmt(v) : v }
         }
       }
-    }
+    },
+    plugins: [mktChPctPlugin]
   });
 
   // HTML tooltip (mktChannelTooltip)
@@ -2547,13 +2620,15 @@ function renderMktChannelChart() {
   function mctBuildContent(ch, q, deals, total, quarterTotal) {
     const chColor = COLORS[ch]?.text || '#fff';
     const isAmt = metric === 'amount';
-    const rows = deals.map(d =>
-      '<div class="ct-row">' +
+    const rows = deals.map(d => {
+      const aC = d.stage === 'MQL' ? '#818cf8' : '#10b981';
+      return '<div class="ct-row">' +
       '<span class="ct-deal-name" title="' + d.name + '">' + d.name + '</span>' +
-      '<span class="ct-amt">' + (isAmt && d.amount ? 'DKK ' + fmtFull(d.amount) : '—') + '</span>' +
+      '<span class="ct-amt" style="color:' + aC + '">' + (isAmt && d.amount ? 'DKK ' + fmtFull(d.amount) : '—') + '</span>' +
       '<span class="ct-src">' + d.source + '</span>' +
       '<span class="ct-date">' + (d.createDate ? d.createDate.split('-').reverse().join('/') : '—') + '</span>' +
-      '</div>').join('');
+      '</div>';
+    }).join('');
     return '<div class="ct-header">' +
       '<span class="ct-title" style="color:' + chColor + '">' + ch + ' · ' + q + '</span>' +
       '<span class="ct-total">' + (isAmt ? 'DKK ' + fmtFull(total) + ' · ' : '') + deals.length + ' deal' + (deals.length!==1?'s':'') + '</span>' +
@@ -2587,6 +2662,15 @@ function renderMktChannelChart() {
   mctCanvas.addEventListener('mouseleave', () => {
     if (mctTooltip._pinned) return;
     mctHideTimer = setTimeout(() => { if (!mctTooltip._pinned) mctTooltip.classList.remove('visible'); }, 180);
+  });
+  mctCanvas.addEventListener('click', e => {
+    const pts = charts['mktChannel'].getElementsAtEventForMode(e, 'nearest', {intersect: true}, false);
+    if (!pts.length) return;
+    mctShow(e.clientX, e.clientY, pts, true);
+  });
+  document.addEventListener('click', e => {
+    if (!mctTooltip._pinned) return;
+    if (!mctTooltip.contains(e.target) && e.target !== mctCanvas) { mctTooltip.classList.remove('visible'); mctTooltip._pinned = false; }
   });
   mctTooltip.addEventListener('mouseenter', () => clearTimeout(mctHideTimer));
   mctTooltip.addEventListener('mouseleave', () => { if (!mctTooltip._pinned) mctTooltip.classList.remove('visible'); });
@@ -2631,7 +2715,7 @@ function renderMktSourceChart() {
     type: 'bar',
     data: { labels: quarters, datasets },
     options: {
-      responsive: true, maintainAspectRatio: true,
+      responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { position: 'top' },
         tooltip: { callbacks: { label: c2 => ` ${c2.dataset.label}: DKK ${fmt(c2.raw)}` } }
@@ -2707,7 +2791,7 @@ function renderMktWinRate() {
     },
     options: {
       indexAxis: 'y',
-      responsive: true, maintainAspectRatio: true,
+      responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -2720,10 +2804,9 @@ function renderMktWinRate() {
         }
       },
       scales: {
-        x: { min: 0, max: 100, ticks: { callback: v => v + '%' } },
+        x: { min: 0, max: 115, ticks: { callback: v => v <= 100 ? v + '%' : '' } },
         y: { grid: { display: false } }
-      },
-      layout: { padding: { right: 150 } }
+      }
     },
     plugins: [wrLabelPlugin]
   });
@@ -2759,6 +2842,32 @@ function renderMktByQuarterChart() {
   ];
 
   const ctx = document.getElementById('mktQtrChart').getContext('2d');
+
+  const yoyPlugin = {
+    id: 'yoyArrows',
+    afterDatasetsDraw(chart) {
+      const {ctx: c, data} = chart;
+      [1, 2].forEach(di => {
+        const meta = chart.getDatasetMeta(di);
+        if (meta.hidden) return;
+        meta.data.forEach((bar, idx) => {
+          const cur  = data.datasets[di].data[idx] || 0;
+          const prev = data.datasets[di - 1].data[idx] || 0;
+          if (!prev || !cur) return;
+          const pct = Math.round((cur - prev) / prev * 100);
+          const label = (pct >= 0 ? '▲' : '▼') + ' ' + Math.abs(pct) + '%';
+          c.save();
+          c.font = 'bold 9px system-ui, sans-serif';
+          c.fillStyle = pct >= 0 ? '#10b981' : '#ef4444';
+          c.textAlign = 'center';
+          c.textBaseline = 'bottom';
+          c.fillText(label, bar.x, bar.y - 2);
+          c.restore();
+        });
+      });
+    }
+  };
+
   charts['mktQtr'] = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -2772,7 +2881,7 @@ function renderMktByQuarterChart() {
       }))
     },
     options: {
-      responsive: true, maintainAspectRatio: true,
+      responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { position: 'top' },
         tooltip: { enabled: false },
@@ -2781,7 +2890,8 @@ function renderMktByQuarterChart() {
         x: { grid: { display: false } },
         y: { beginAtZero: true, ticks: { callback: v => 'DKK ' + fmt(v) } }
       }
-    }
+    },
+    plugins: [yoyPlugin]
   });
 
   // HTML tooltip for quarterly inbound chart
@@ -2794,13 +2904,15 @@ function renderMktByQuarterChart() {
     const yIdx = YEARS.indexOf(yr);
     const color = YEAR_COLORS[yIdx]?.text || '#818cf8';
     const total = deals.reduce((s,d) => s+d.amount, 0);
-    const rows = deals.map(d =>
-      '<div class="ct-row">' +
+    const rows = deals.map(d => {
+      const aC = d.stage === 'MQL' ? '#818cf8' : '#10b981';
+      return '<div class="ct-row">' +
       '<span class="ct-deal-name" title="' + d.name + '">' + d.name + '</span>' +
-      '<span class="ct-amt">' + (d.amount ? 'DKK ' + fmtFull(d.amount) : '—') + '</span>' +
+      '<span class="ct-amt" style="color:' + aC + '">' + (d.amount ? 'DKK ' + fmtFull(d.amount) : '—') + '</span>' +
       '<span class="ct-src">' + d.source + '</span>' +
       '<span class="ct-date">' + (d.createDate ? d.createDate.split('-').reverse().join('/') : '—') + '</span>' +
-      '</div>').join('');
+      '</div>';
+    }).join('');
     return '<div class="ct-header">' +
       '<span class="ct-title" style="color:' + color + '">' + yr + ' · ' + qLabel + '</span>' +
       '<span class="ct-total">DKK ' + fmtFull(total) + ' · ' + deals.length + ' deal' + (deals.length!==1?'s':'') + '</span>' +
@@ -2833,6 +2945,15 @@ function renderMktByQuarterChart() {
   qtrCanvas.addEventListener('mouseleave', () => {
     if (qtrTooltip._pinned) return;
     qtrHideTimer = setTimeout(() => { if (!qtrTooltip._pinned) qtrTooltip.classList.remove('visible'); }, 180);
+  });
+  qtrCanvas.addEventListener('click', e => {
+    const pts = charts['mktQtr'].getElementsAtEventForMode(e, 'nearest', {intersect: true}, false);
+    if (!pts.length) return;
+    qtrShow(e.clientX, e.clientY, pts, true);
+  });
+  document.addEventListener('click', e => {
+    if (!qtrTooltip._pinned) return;
+    if (!qtrTooltip.contains(e.target) && e.target !== qtrCanvas) { qtrTooltip.classList.remove('visible'); qtrTooltip._pinned = false; }
   });
   qtrTooltip.addEventListener('mouseenter', () => clearTimeout(qtrHideTimer));
   qtrTooltip.addEventListener('mouseleave', () => { if (!qtrTooltip._pinned) qtrTooltip.classList.remove('visible'); });
@@ -2945,7 +3066,7 @@ function renderPipelineVelocity() {
     },
     options: {
       indexAxis: 'y',
-      responsive: true, maintainAspectRatio: true,
+      responsive: true, maintainAspectRatio: false,
       layout: { padding: { right: 200 } },
       plugins: {
         legend: { display: false },
@@ -2965,6 +3086,108 @@ function renderPipelineVelocity() {
   });
 }
 
+// ── Pipeline Velocity by Inbound Source ────────────────────────────────────
+function renderInboundSourceVelocity() {
+  destroyChart('mktSrcVelocity');
+  const QN = {Q1:1, Q2:4, Q3:7, Q4:10};
+  function qToMonth(q) {
+    const parts = q.split(' ');
+    return parseInt(parts[1]) * 12 + (QN[parts[0]] || 1);
+  }
+
+  // Build stats per inbound source
+  const stats = {};
+  MKT_SOURCES.forEach(s => stats[s] = { won: [], lost: 0 });
+  RAW_DEALS.forEach(d => {
+    if (!MKT_SOURCES.includes(d.source)) return;
+    if (d.isClosedWon && d.createQuarter && d.closeQuarter) {
+      const cycle = Math.max(1, (qToMonth(d.closeQuarter) - qToMonth(d.createQuarter)) + 3);
+      stats[d.source].won.push({ amount: d.amount, cycle });
+    }
+    if (d.isClosedLost) stats[d.source].lost++;
+  });
+
+  // Filter to sources with at least 1 won deal
+  const rows = MKT_SOURCES
+    .map((src, i) => ({ src, i, ...stats[src] }))
+    .filter(r => r.won.length >= 1)
+    .map(r => {
+      const winRate  = r.won.length / (r.won.length + r.lost);
+      const avgDeal  = r.won.reduce((s,w) => s + w.amount, 0) / r.won.length;
+      const avgCycle = r.won.reduce((s,w) => s + w.cycle,  0) / r.won.length;
+      const vel      = Math.round((r.won.length * winRate * avgDeal) / avgCycle);
+      return { ...r, winRate, avgDeal, avgCycle, vel };
+    })
+    .sort((a,b) => b.vel - a.vel);
+
+  const canvas = document.getElementById('mktSrcVelocityChart');
+  if (!canvas) return;
+
+  if (!rows.length) {
+    canvas.parentElement.innerHTML = '<p style="color:#94a3b8;font-size:13px;padding:16px 0 8px">Ikke nok lukkede inbound deals.</p>';
+    return;
+  }
+
+  // Plugin: draw DKK value label to the right of each bar
+  const srcVelPlugin = {
+    id: 'srcVelLabel',
+    afterDatasetsDraw(chart) {
+      const {ctx: c, data} = chart;
+      const meta = chart.getDatasetMeta(0);
+      meta.data.forEach((bar, idx) => {
+        const val = data.datasets[0].data[idx];
+        if (!val) return;
+        c.save();
+        c.font = 'bold 11px system-ui, sans-serif';
+        c.fillStyle = '#1e293b';
+        c.textAlign = 'left';
+        c.textBaseline = 'middle';
+        c.fillText('DKK ' + fmt(val) + ' / md', bar.x + 8, bar.y);
+        c.restore();
+      });
+    }
+  };
+
+  const ctx = canvas.getContext('2d');
+  charts['mktSrcVelocity'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => r.src),
+      datasets: [{
+        label: 'Pipeline Velocity (DKK/md)',
+        data:  rows.map(r => r.vel),
+        backgroundColor: rows.map(r => MKT_COLORS[r.i % MKT_COLORS.length]),
+        borderColor:     rows.map(r => MKT_BORDERS[r.i % MKT_BORDERS.length]),
+        borderWidth: 1, borderRadius: 6,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { right: 200 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label:      c2 => ' DKK ' + fmt(c2.raw) + ' / måned',
+            afterLabel: c2 => {
+              const r = rows[c2.dataIndex];
+              return ' Win rate: ' + (r.winRate*100).toFixed(0) + '% (' + r.won.length + 'W/' + r.lost + 'L)  |  ' +
+                     'Gns. deal: DKK ' + fmt(Math.round(r.avgDeal)) + '  |  ' +
+                     'Gns. cyklus: ' + r.avgCycle.toFixed(1) + ' mdr';
+            }
+          }
+        }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { callback: v => 'DKK ' + fmt(v) } },
+        y: { grid: { display: false } }
+      }
+    },
+    plugins: [srcVelPlugin]
+  });
+}
+
 
 // ── Init ──────────────────────────────────────────────────────────────────
 function updateCharts(){
@@ -2974,6 +3197,22 @@ function updateCharts(){
   // Re-render marketing tab if it was already opened
   if (_mktRendered) renderAllMarketing();
 }
+function updateDataDate() {
+  // Find the most recent date across all deal create + close dates
+  let maxDate = '';
+  RAW_DEALS.forEach(d => {
+    if (d.createDate && d.createDate > maxDate) maxDate = d.createDate;
+    if (d.closeDate  && d.closeDate  > maxDate) maxDate = d.closeDate;
+  });
+  if (!maxDate) return;
+  // Format as "14. Mar 2026"
+  const months = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+  const parts = maxDate.split('-');
+  const label = parseInt(parts[2], 10) + '. ' + months[parseInt(parts[1], 10) - 1] + ' ' + parts[0];
+  const el = document.getElementById('headerSubtitle');
+  if (el) el.textContent = 'Coverage, generation & win rate analysis · Data as of ' + label;
+}
+
 function init(){
   buildTargetInputs();
   renderKPIs();
@@ -2992,6 +3231,7 @@ function init(){
   const won=RAW_DEALS.filter(d=>d.isClosedWon).length;
   const open=RAW_DEALS.filter(d=>d.isOpen).length;
   document.getElementById('lastUpdated').textContent=`${RAW_DEALS.length} deals · ${won} won · ${open} open`;
+  updateDataDate();
 }
 
 // ── Embed / iframe mode ────────────────────────────────────────────────────
