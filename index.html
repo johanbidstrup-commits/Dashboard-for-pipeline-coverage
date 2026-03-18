@@ -475,10 +475,82 @@
     body.embed-mode .grid { padding: 0 6px 8px; gap: 6px; }
     body.embed-mode .card h2 { font-size: 12px; }
   }
+
+  /* ── Login overlay ─────────────────────────────────────────────────────── */
+  #loginOverlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #loginBox {
+    background: white; border-radius: 16px; padding: 40px 36px;
+    width: 100%; max-width: 380px; box-shadow: 0 24px 64px rgba(0,0,0,0.18);
+    text-align: center;
+  }
+  #loginBox h1 { font-size: 22px; font-weight: 700; color: #1e293b; margin: 0 0 6px; }
+  #loginBox p  { font-size: 13px; color: #94a3b8; margin: 0 0 28px; }
+  #loginPw {
+    width: 100%; box-sizing: border-box;
+    padding: 11px 14px; font-size: 15px;
+    border: 2px solid #e2e8f0; border-radius: 8px;
+    outline: none; transition: border-color .15s;
+    margin-bottom: 14px;
+  }
+  #loginPw:focus { border-color: #6366f1; }
+  #loginBtn {
+    width: 100%; padding: 12px; font-size: 15px; font-weight: 600;
+    background: #6366f1; color: white; border: none; border-radius: 8px;
+    cursor: pointer; transition: background .15s;
+  }
+  #loginBtn:hover { background: #4f46e5; }
+  #loginErr {
+    margin-top: 12px; font-size: 13px; color: #ef4444; min-height: 18px;
+  }
+  body.locked { overflow: hidden; }
+
 </style>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
+<div id="loginOverlay">
+  <div id="loginBox">
+    <h1>📊 Pipeline Dashboard</h1>
+    <p>Ekko Software — intern adgang</p>
+    <input type="password" id="loginPw" placeholder="Password" autocomplete="current-password"
+           onkeydown="if(event.key==='Enter')doLogin()">
+    <button id="loginBtn" onclick="doLogin()">Log ind</button>
+    <div id="loginErr"></div>
+  </div>
+</div>
+<script>
+(function() {
+  const HASH = '9a3b0cb59595db7a8003c9bb92b44a8d580c3ab0630227274222f5ae43faf0eb';
+  const SK   = 'ekko_dash_auth';
+  // Skip login when embedded in an iframe or ?embed=1 is set
+  const inEmbed = (function(){ try { return window.self !== window.top; } catch(e){ return true; } })()
+                  || /[?&]embed=1/.test(window.location.search);
+  if (inEmbed || sessionStorage.getItem(SK) === HASH) {
+    document.getElementById('loginOverlay').style.display = 'none';
+  } else {
+    document.body.classList.add('locked');
+  }
+})();
+
+async function doLogin() {
+  const pw  = document.getElementById('loginPw').value;
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+  const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  if (hex === '9a3b0cb59595db7a8003c9bb92b44a8d580c3ab0630227274222f5ae43faf0eb') {
+    sessionStorage.setItem('ekko_dash_auth', hex);
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.body.classList.remove('locked');
+  } else {
+    document.getElementById('loginErr').textContent = 'Forkert password — prøv igen';
+    document.getElementById('loginPw').value = '';
+    document.getElementById('loginPw').focus();
+  }
+}
+</script>
+
 
 <div class="header">
   <div>
@@ -710,17 +782,10 @@
   <div class="kpi-bar" id="mktKpiBar"></div>
   <div class="grid">
 
-    <!-- MQL Lead Queue (full width) -->
-    <div class="card grid-full">
-      <h2>📋 MQL Lead Queue</h2>
-      <p class="subtitle">Deals der afventer salgskvalificering — MQL stage</p>
-      <div id="mqlQueue"></div>
-    </div>
-
-    <!-- Inbound vs Outbound vs Partner -->
+    <!-- Inbound vs Partner -->
     <div class="card">
       <h2>Inbound vs Outbound vs Partner — Pipeline by Quarter</h2>
-      <p class="subtitle">Total deal value skabt per kvartal, grupperet efter kanal</p>
+      <p class="subtitle">Pipeline skabt per kvartal — Inbound (marketing-kilder) vs Partner</p>
       <div class="chart-local-filter">
         <label>Show:</label>
         <select id="mktChShow" onchange="renderMktChannelChart()">
@@ -762,15 +827,7 @@
     <!-- Inbound Pipeline by Quarter trend -->
     <div class="card">
       <h2>Inbound Pipeline by Quarter</h2>
-      <p class="subtitle">Pipeline skabt fra inbound-kilder per kvartal</p>
-      <div class="chart-local-filter">
-        <label>From year:</label>
-        <select id="mktQtrFrom" onchange="renderMktByQuarterChart()">
-          <option value="2024">2024</option>
-          <option value="2025" selected>2025</option>
-          <option value="2026">2026</option>
-        </select>
-      </div>
+      <p class="subtitle">Pipeline skabt fra inbound-kilder — 2024 vs 2025 vs 2026</p>
       <div class="chart-wrap"><canvas id="mktQtrChart"></canvas></div>
     </div>
 
@@ -781,61 +838,6 @@
       <div class="chart-wrap"><canvas id="mktVelocityChart"></canvas></div>
     </div>
 
-    <!-- Google Search Console -->
-    <div class="card grid-full" id="gscCard">
-      <h2>🔍 Google Search Console</h2>
-      <p class="subtitle">Organisk søgetrafik til ekkosoftware.dk fra Google</p>
-      <div id="gscConnectSection">
-        <p style="color:#64748b;font-size:13px;margin-bottom:12px">Forbind Google Search Console for at vise søgedata. Du skal bruge et <strong>Google OAuth 2.0 Client ID</strong> fra <a href="https://console.cloud.google.com/" target="_blank" style="color:#6366f1">Google Cloud Console</a>.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
-          <input type="text" id="gscClientId" placeholder="Client ID (xyz.apps.googleusercontent.com)..." style="flex:1;min-width:260px;padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px">
-          <input type="text" id="gscSiteUrl" placeholder="https://ekkosoftware.dk/" value="https://ekkosoftware.dk/" style="width:210px;padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px">
-          <button onclick="gscConnect()" class="gh-btn" style="white-space:nowrap">🔑 Log ind med Google</button>
-        </div>
-        <div id="gscStatus" style="font-size:12px;color:#64748b"></div>
-        <details style="margin-top:12px;font-size:12px;color:#64748b">
-          <summary style="cursor:pointer;color:#6366f1;font-weight:600">Sådan opretter du et Client ID →</summary>
-          <ol style="margin:8px 0 0 16px;line-height:1.8">
-            <li>Gå til <a href="https://console.cloud.google.com/" target="_blank" style="color:#6366f1">console.cloud.google.com</a> og opret/vælg et projekt</li>
-            <li>Aktivér <strong>Google Search Console API</strong> (APIs &amp; Services → Library)</li>
-            <li>Gå til APIs &amp; Services → Credentials → Create Credentials → OAuth client ID</li>
-            <li>Vælg <strong>Web application</strong> og tilføj dashboardets URL under "Authorised JavaScript origins"</li>
-            <li>Kopiér Client ID og indsæt herover</li>
-          </ol>
-        </details>
-      </div>
-      <div id="gscCharts" style="display:none">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
-          <span id="gscConnectedAs" style="font-size:13px;color:#64748b"></span>
-          <div style="display:flex;gap:8px;align-items:center">
-            <select id="gscDays" onchange="gscFetch()" style="padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px">
-              <option value="90">Seneste 90 dage</option>
-              <option value="180">Seneste 6 måneder</option>
-              <option value="365" selected>Seneste 12 måneder</option>
-            </select>
-            <button onclick="gscDisconnect()" style="padding:5px 10px;font-size:12px;color:#94a3b8;background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer">Disconnect</button>
-          </div>
-        </div>
-        <div class="grid" style="padding:0;gap:12px">
-          <div class="card" style="margin:0;box-shadow:none;border:1px solid #e2e8f0">
-            <h2 style="font-size:13px">Klik over tid</h2>
-            <div class="chart-wrap" style="height:180px"><canvas id="gscClicksChart"></canvas></div>
-          </div>
-          <div class="card" style="margin:0;box-shadow:none;border:1px solid #e2e8f0">
-            <h2 style="font-size:13px">Impressions over tid</h2>
-            <div class="chart-wrap" style="height:180px"><canvas id="gscImpressionsChart"></canvas></div>
-          </div>
-          <div class="card grid-full" style="margin:0;box-shadow:none;border:1px solid #e2e8f0">
-            <h2 style="font-size:13px">Gennemsnitlig placering i Google (lavere = bedre)</h2>
-            <div class="chart-wrap" style="height:180px"><canvas id="gscPositionChart"></canvas></div>
-          </div>
-          <div class="card grid-full" style="margin:0;box-shadow:none;border:1px solid #e2e8f0">
-            <h2 style="font-size:13px">Top søgeord</h2>
-            <div id="gscQueriesTable"></div>
-          </div>
-        </div>
-      </div>
-    </div>
 
   </div>
 </div><!-- /marketingTab -->
@@ -2330,7 +2332,6 @@ function switchTab(tab) {
 
 function renderAllMarketing() {
   renderMarketingKPIs();
-  renderMQLQueue();
   renderMktChannelChart();
   renderMktSourceChart();
   renderMktWinRate();
@@ -2425,16 +2426,6 @@ function renderMarketingKPIs() {
   _mktKpiData = { mql, ibOpen, ytd26 };
 
   document.getElementById('mktKpiBar').innerHTML = `
-    <div class="kpi-card" data-kpi="mql" style="cursor:pointer" title="Hover for deals">
-      <div class="kpi-label">MQL i kø 🔍</div>
-      <div class="kpi-value">${mql.length}</div>
-      <div class="kpi-sub">DKK ${fmt(mql.reduce((s,d) => s+d.amount, 0))} i pipeline</div>
-    </div>
-    <div class="kpi-card" data-kpi="ibOpen" style="cursor:pointer" title="Hover for deals">
-      <div class="kpi-label">Inbound Open Pipeline 🔍</div>
-      <div class="kpi-value">DKK ${fmt(ibOpenVal)}</div>
-      <div class="kpi-sub">${ibOpen.length} aktive deals</div>
-    </div>
     <div class="kpi-card">
       <div class="kpi-label">Inbound Win Rate</div>
       <div class="kpi-value">${ibWinRate.toFixed(0)}%</div>
@@ -2485,7 +2476,7 @@ function renderMQLQueue() {
 
 function renderMktChannelChart() {
   destroyChart('mktChannel');
-  const INBOUND_SET = new Set(MKT_SOURCES);
+  const INBOUND_SET  = new Set(MKT_SOURCES);
   const OUTBOUND_SET = new Set(['Salgsbrev','Outbound','We Rock Sales','Hjælp-til-salg']);
   const PARTNER_SET  = new Set(['Partner']);
   const CHANNELS = ['Inbound','Outbound','Partner'];
@@ -2513,43 +2504,9 @@ function renderMktChannelChart() {
   Object.values(dealMap).forEach(arr => arr.sort((a,b) => b.amount - a.amount));
   const quarters = sortQuarters(Object.keys(byQ));
   const COLORS = {
-    Inbound:  { bg:'rgba(99,102,241,0.82)', border:'rgba(99,102,241,1)', text:'#818cf8' },
-    Outbound: { bg:'rgba(245,158,11,0.82)', border:'rgba(245,158,11,1)', text:'#fbbf24' },
-    Partner:  { bg:'rgba(16,185,129,0.82)', border:'rgba(16,185,129,1)', text:'#34d399' },
-  };
-
-  const pctLabelPlugin = {
-    id: 'mktPctLabel',
-    afterDatasetsDraw(chart) {
-      const {ctx, data} = chart;
-      data.datasets.forEach((dataset, di) => {
-        const meta = chart.getDatasetMeta(di);
-        if (meta.hidden) return;
-        meta.data.forEach((bar, idx) => {
-          const total = data.datasets.reduce((s, ds, dsi) => {
-            const m = chart.getDatasetMeta(dsi);
-            return m.hidden ? s : s + (ds.data[idx] || 0);
-          }, 0);
-          if (!total || !dataset.data[idx]) return;
-          const pct = Math.round((dataset.data[idx] / total) * 100);
-          if (!pct) return;
-          const barH = bar.base - bar.y;
-          ctx.save();
-          ctx.font = 'bold 10px system-ui, sans-serif';
-          ctx.textAlign = 'center';
-          if (barH > 24) {
-            ctx.fillStyle = 'rgba(255,255,255,0.95)';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(pct + '%', bar.x, bar.y + barH / 2);
-          } else if (barH > 6) {
-            ctx.fillStyle = '#374151';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText(pct + '%', bar.x, bar.y - 2);
-          }
-          ctx.restore();
-        });
-      });
-    }
+    Inbound:  { bg:'rgba(99,102,241,0.82)',  border:'rgba(99,102,241,1)',  text:'#818cf8' },
+    Outbound: { bg:'rgba(245,158,11,0.82)',  border:'rgba(245,158,11,1)',  text:'#fbbf24' },
+    Partner:  { bg:'rgba(16,185,129,0.82)',  border:'rgba(16,185,129,1)',  text:'#34d399' },
   };
 
   const ctx = document.getElementById('mktChannelChart').getContext('2d');
@@ -2572,44 +2529,38 @@ function renderMktChannelChart() {
         tooltip: { enabled: false },
       },
       scales: {
-        x: { stacked: true, grid: { display: false } },
+        x: { grid: { display: false } },
         y: {
-          stacked: true, beginAtZero: true,
+          beginAtZero: true,
           ticks: { callback: v => metric === 'amount' ? 'DKK ' + fmt(v) : v }
         }
       }
-    },
-    plugins: [pctLabelPlugin]
+    }
   });
 
-  // ── HTML tooltip (reuses mktChannelTooltip) ──────────────────────────────
+  // HTML tooltip (mktChannelTooltip)
   const mctCanvas  = ctx.canvas;
   const mctTooltip = document.getElementById('mktChannelTooltip');
   let mctHideTimer = null;
 
+  function closeMctTooltip() { var t=document.getElementById('mktChannelTooltip'); t.classList.remove('visible'); t._pinned=false; }
   function mctBuildContent(ch, q, deals, total, quarterTotal) {
     const chColor = COLORS[ch]?.text || '#fff';
-    const pct = quarterTotal > 0 ? Math.round(total / quarterTotal * 100) : null;
-    const pctBadge = pct !== null
-      ? `<span style="background:${chColor}22;color:${chColor};font-weight:700;font-size:12px;padding:2px 8px;border-radius:99px;margin-left:4px">${pct}%</span>` : '';
     const isAmt = metric === 'amount';
-    const rows = deals.map(d => `
-      <div class="ct-row">
-        <span class="ct-deal-name" title="${d.name}">${d.name}</span>
-        <span class="ct-amt">${isAmt && d.amount ? 'DKK ' + fmtFull(d.amount) : '—'}</span>
-        <span class="ct-src">${d.source}</span>
-        <span class="ct-date">${d.createDate ? d.createDate.split('-').reverse().join('/') : '—'}</span>
-      </div>`).join('');
-    return `
-      <div class="ct-header">
-        <span class="ct-title" style="color:${chColor}">${ch} · ${q}</span>${pctBadge}
-        <span class="ct-total">${isAmt ? 'DKK ' + fmtFull(total) + ' · ' : ''}${deals.length} deal${deals.length!==1?'s':''}</span>
-        <button class="ct-close" onclick="var t=document.getElementById('mktChannelTooltip');t.classList.remove('visible');t._pinned=false;">✕</button>
-      </div>
-      <div class="ct-col-hdr">
-        <span>Deal name</span><span style="text-align:right">Amount</span><span>Source</span><span style="text-align:right">Created</span>
-      </div>
-      <div class="ct-body">${rows}</div>`;
+    const rows = deals.map(d =>
+      '<div class="ct-row">' +
+      '<span class="ct-deal-name" title="' + d.name + '">' + d.name + '</span>' +
+      '<span class="ct-amt">' + (isAmt && d.amount ? 'DKK ' + fmtFull(d.amount) : '—') + '</span>' +
+      '<span class="ct-src">' + d.source + '</span>' +
+      '<span class="ct-date">' + (d.createDate ? d.createDate.split('-').reverse().join('/') : '—') + '</span>' +
+      '</div>').join('');
+    return '<div class="ct-header">' +
+      '<span class="ct-title" style="color:' + chColor + '">' + ch + ' · ' + q + '</span>' +
+      '<span class="ct-total">' + (isAmt ? 'DKK ' + fmtFull(total) + ' · ' : '') + deals.length + ' deal' + (deals.length!==1?'s':'') + '</span>' +
+      '<button class="ct-close" onclick="closeMctTooltip()">✕</button>' +
+      '</div>' +
+      '<div class="ct-col-hdr"><span>Deal name</span><span style="text-align:right">Amount</span><span>Source</span><span style="text-align:right">Created</span></div>' +
+      '<div class="ct-body">' + rows + '</div>';
   }
 
   function mctShow(clientX, clientY, pts, pinned) {
@@ -2720,6 +2671,29 @@ function renderMktWinRate() {
     wrap.innerHTML = '<canvas id="mktWinRateChart"></canvas>';
   }
   const ctx = document.getElementById('mktWinRateChart').getContext('2d');
+
+  // Plugin: draw pct label to right of each bar
+  const wrLabelPlugin = {
+    id: 'wrLabel',
+    afterDatasetsDraw(chart) {
+      const {ctx: c, data} = chart;
+      const meta = chart.getDatasetMeta(0);
+      meta.data.forEach((bar, idx) => {
+        const val = data.datasets[0].data[idx];
+        if (val == null) return;
+        const r = rows[idx];
+        const label = val + '%  (' + r.won + 'W/' + r.lost + 'L)';
+        c.save();
+        c.font = 'bold 11px system-ui, sans-serif';
+        c.fillStyle = '#374151';
+        c.textAlign = 'left';
+        c.textBaseline = 'middle';
+        c.fillText(label, bar.x + 6, bar.y);
+        c.restore();
+      });
+    }
+  };
+
   charts['mktWinRate'] = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -2748,20 +2722,20 @@ function renderMktWinRate() {
       scales: {
         x: { min: 0, max: 100, ticks: { callback: v => v + '%' } },
         y: { grid: { display: false } }
-      }
-    }
+      },
+      layout: { padding: { right: 150 } }
+    },
+    plugins: [wrLabelPlugin]
   });
 }
 
 function renderMktByQuarterChart() {
   destroyChart('mktQtr');
-  const fromYr = parseInt((document.getElementById('mktQtrFrom')||{value:'2025'}).value) || 2025;
-  const prevYr = fromYr - 1;
-
-  // Build per-Qx maps for current year and previous year
+  const YEARS  = [2024, 2025, 2026];
   const qLabels = ['Q1','Q2','Q3','Q4'];
-  const curData  = {}, prevData = {}, curCnt = {}, prevCnt = {};
-  qLabels.forEach(q => { curData[q]=0; prevData[q]=0; curCnt[q]=0; prevCnt[q]=0; });
+  const byYrQ  = {};
+  const dealMap = {};
+  YEARS.forEach(yr => { byYrQ[yr] = {}; qLabels.forEach(q => { byYrQ[yr][q]=0; }); });
 
   RAW_DEALS.forEach(d => {
     if (!MKT_SOURCES.includes(d.source)) return;
@@ -2770,46 +2744,38 @@ function renderMktByQuarterChart() {
     const parts = q.split(' ');
     const qLabel = parts[0];
     const yr     = parseInt(parts[1]);
-    if (!qLabels.includes(qLabel)) return;
-    if (yr === fromYr) { curData[qLabel]  += d.amount; curCnt[qLabel]++;  }
-    if (yr === prevYr) { prevData[qLabel] += d.amount; prevCnt[qLabel]++; }
+    if (!YEARS.includes(yr) || !qLabels.includes(qLabel)) return;
+    byYrQ[yr][qLabel] += d.amount;
+    const key = yr + '|' + qLabel;
+    if (!dealMap[key]) dealMap[key] = [];
+    dealMap[key].push(d);
   });
+  Object.values(dealMap).forEach(arr => arr.sort((a,b) => b.amount - a.amount));
+
+  const YEAR_COLORS = [
+    { bg:'rgba(148,163,184,0.7)', border:'rgba(148,163,184,1)', text:'#64748b' },
+    { bg:'rgba(165,180,252,0.82)', border:'rgba(99,102,241,1)', text:'#818cf8' },
+    { bg:'rgba(99,102,241,0.9)',   border:'rgba(79,70,229,1)',  text:'#6366f1' },
+  ];
 
   const ctx = document.getElementById('mktQtrChart').getContext('2d');
   charts['mktQtr'] = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: qLabels,
-      datasets: [
-        {
-          label: String(prevYr) + ' (forrige år)',
-          data:  qLabels.map(q => prevData[q]),
-          backgroundColor: 'rgba(148,163,184,0.6)',
-          borderColor:     'rgba(148,163,184,1)',
-          borderWidth: 1, borderRadius: 4,
-        },
-        {
-          label: String(fromYr) + ' (nuværende)',
-          data:  qLabels.map(q => curData[q]),
-          backgroundColor: 'rgba(99,102,241,0.82)',
-          borderColor:     'rgba(99,102,241,1)',
-          borderWidth: 1, borderRadius: 4,
-        }
-      ]
+      datasets: YEARS.map((yr, i) => ({
+        label: String(yr),
+        data:  qLabels.map(q => byYrQ[yr][q]),
+        backgroundColor: YEAR_COLORS[i].bg,
+        borderColor:     YEAR_COLORS[i].border,
+        borderWidth: 1, borderRadius: 4,
+      }))
     },
     options: {
       responsive: true, maintainAspectRatio: true,
       plugins: {
         legend: { position: 'top' },
-        tooltip: {
-          callbacks: {
-            label: c2 => {
-              const isNew = c2.datasetIndex === 1;
-              const cnt   = isNew ? curCnt[qLabels[c2.dataIndex]] : prevCnt[qLabels[c2.dataIndex]];
-              return ` DKK ${fmt(c2.raw)} (${cnt} deals)`;
-            }
-          }
-        }
+        tooltip: { enabled: false },
       },
       scales: {
         x: { grid: { display: false } },
@@ -2817,63 +2783,151 @@ function renderMktByQuarterChart() {
       }
     }
   });
+
+  // HTML tooltip for quarterly inbound chart
+  const qtrCanvas  = ctx.canvas;
+  const qtrTooltip = document.getElementById('mktQtrTooltip');
+  let qtrHideTimer = null;
+
+  function closeQtrTooltip() { var t=document.getElementById('mktQtrTooltip'); t.classList.remove('visible'); t._pinned=false; }
+  function qtrBuildContent(yr, qLabel, deals) {
+    const yIdx = YEARS.indexOf(yr);
+    const color = YEAR_COLORS[yIdx]?.text || '#818cf8';
+    const total = deals.reduce((s,d) => s+d.amount, 0);
+    const rows = deals.map(d =>
+      '<div class="ct-row">' +
+      '<span class="ct-deal-name" title="' + d.name + '">' + d.name + '</span>' +
+      '<span class="ct-amt">' + (d.amount ? 'DKK ' + fmtFull(d.amount) : '—') + '</span>' +
+      '<span class="ct-src">' + d.source + '</span>' +
+      '<span class="ct-date">' + (d.createDate ? d.createDate.split('-').reverse().join('/') : '—') + '</span>' +
+      '</div>').join('');
+    return '<div class="ct-header">' +
+      '<span class="ct-title" style="color:' + color + '">' + yr + ' · ' + qLabel + '</span>' +
+      '<span class="ct-total">DKK ' + fmtFull(total) + ' · ' + deals.length + ' deal' + (deals.length!==1?'s':'') + '</span>' +
+      '<button class="ct-close" onclick="closeQtrTooltip()">✕</button>' +
+      '</div>' +
+      '<div class="ct-col-hdr"><span>Deal name</span><span style="text-align:right">Amount</span><span>Source</span><span style="text-align:right">Created</span></div>' +
+      '<div class="ct-body">' + rows + '</div>';
+  }
+
+  function qtrShow(clientX, clientY, pts, pinned) {
+    if (!pts.length) return;
+    const {datasetIndex, index} = pts[0];
+    const yr     = YEARS[datasetIndex];
+    const qLabel = qLabels[index];
+    const deals  = dealMap[yr + '|' + qLabel] || [];
+    if (!deals.length) return;
+    qtrTooltip.innerHTML = qtrBuildContent(yr, qLabel, deals);
+    qtrTooltip._pinned = pinned;
+    qtrTooltip.classList.add('visible');
+    positionAnyTooltip(qtrTooltip, clientX, clientY);
+  }
+
+  qtrCanvas.addEventListener('mousemove', e => {
+    if (qtrTooltip._pinned) return;
+    clearTimeout(qtrHideTimer);
+    const pts = charts['mktQtr'].getElementsAtEventForMode(e, 'nearest', {intersect: true}, false);
+    if (!pts.length) { qtrHideTimer = setTimeout(() => { if (!qtrTooltip._pinned) qtrTooltip.classList.remove('visible'); }, 80); return; }
+    qtrShow(e.clientX, e.clientY, pts, false);
+  });
+  qtrCanvas.addEventListener('mouseleave', () => {
+    if (qtrTooltip._pinned) return;
+    qtrHideTimer = setTimeout(() => { if (!qtrTooltip._pinned) qtrTooltip.classList.remove('visible'); }, 180);
+  });
+  qtrTooltip.addEventListener('mouseenter', () => clearTimeout(qtrHideTimer));
+  qtrTooltip.addEventListener('mouseleave', () => { if (!qtrTooltip._pinned) qtrTooltip.classList.remove('visible'); });
+  qtrCanvas.addEventListener('touchstart', e => {
+    const touch = e.touches[0];
+    const fakeEvt = new MouseEvent('mousemove', { clientX: touch.clientX, clientY: touch.clientY, bubbles: true });
+    const pts = charts['mktQtr'].getElementsAtEventForMode(fakeEvt, 'nearest', {intersect: true}, false);
+    if (!pts.length) { qtrTooltip.classList.remove('visible'); qtrTooltip._pinned = false; return; }
+    e.preventDefault();
+    qtrShow(touch.clientX, touch.clientY, pts, true);
+  }, { passive: false });
+  document.addEventListener('touchstart', e => {
+    if (!qtrTooltip._pinned) return;
+    if (!qtrTooltip.contains(e.target) && e.target !== qtrCanvas) {
+      qtrTooltip.classList.remove('visible'); qtrTooltip._pinned = false;
+    }
+  }, { passive: true });
 }
 
 // ── Pipeline Velocity ─────────────────────────────────────────────────────
 function renderPipelineVelocity() {
   destroyChart('mktVelocity');
-  const INBOUND_SET2 = new Set(MKT_SOURCES);
-  const OUTBOUND_SET2 = new Set(['Salgsbrev','Outbound','We Rock Sales','Hjælp-til-salg']);
-  const PARTNER_SET2  = new Set(['Partner']);
+  const INBOUND_SET3  = new Set(MKT_SOURCES);
+  const OUTBOUND_SET3 = new Set(['Salgsbrev','Outbound','We Rock Sales','Hjælp-til-salg']);
+  const PARTNER_SET3  = new Set(['Partner']);
   function chFor(src) {
-    if (INBOUND_SET2.has(src))  return 'Inbound';
-    if (OUTBOUND_SET2.has(src)) return 'Outbound';
-    if (PARTNER_SET2.has(src))  return 'Partner';
+    if (INBOUND_SET3.has(src))  return 'Inbound';
+    if (OUTBOUND_SET3.has(src)) return 'Outbound';
+    if (PARTNER_SET3.has(src))  return 'Partner';
     return null;
   }
-
-  // Per channel: collect won deals with both create and close quarter
-  const chStats = { Inbound: { won:[], lost:0 }, Outbound: { won:[], lost:0 }, Partner: { won:[], lost:0 } };
-  const QN = {Q1:1,Q2:4,Q3:7,Q4:10};
+  const QN = {Q1:1, Q2:4, Q3:7, Q4:10};
   function qToMonth(q) {
     const parts = q.split(' ');
     return parseInt(parts[1]) * 12 + (QN[parts[0]] || 1);
   }
-
+  const chStats = {
+    Inbound:  { won:[], lost:0 },
+    Outbound: { won:[], lost:0 },
+    Partner:  { won:[], lost:0 },
+  };
   RAW_DEALS.forEach(d => {
     const ch = chFor(d.source);
     if (!ch) return;
     if (d.isClosedWon && d.createQuarter && d.closeQuarter) {
-      const cycle = Math.max(1, (qToMonth(d.closeQuarter) - qToMonth(d.createQuarter)) + 3); // +3 = ~1 quarter min
+      const cycle = Math.max(1, (qToMonth(d.closeQuarter) - qToMonth(d.createQuarter)) + 3);
       chStats[ch].won.push({ amount: d.amount, cycle });
     }
     if (d.isClosedLost) chStats[ch].lost++;
   });
 
-  const CHANNELS_V = ['Inbound','Outbound','Partner'];
-  const velocities = CHANNELS_V.map(ch => {
-    const { won, lost } = chStats[ch];
-    if (!won.length) return 0;
-    const winRate  = won.length / (won.length + lost) || 0;
-    const avgDeal  = won.reduce((s,w) => s + w.amount, 0) / won.length;
-    const avgCycle = won.reduce((s,w) => s + w.cycle,  0) / won.length; // months
-    return Math.round((won.length * winRate * avgDeal) / avgCycle);
-  });
-
-  const tooltipExtras = CHANNELS_V.map(ch => {
-    const { won, lost } = chStats[ch];
-    if (!won.length) return '—';
-    const winRate  = (won.length / (won.length + lost) * 100).toFixed(0);
-    const avgDeal  = Math.round(won.reduce((s,w) => s + w.amount, 0) / won.length);
-    const avgCycle = (won.reduce((s,w) => s + w.cycle, 0) / won.length).toFixed(1);
-    return `Win rate: ${winRate}% | Gns. deal: DKK ${fmt(avgDeal)} | Gns. cyklus: ${avgCycle} mdr`;
-  });
-
+  const CHANNELS_V  = ['Inbound','Outbound','Partner'];
+  const velocities  = [];
+  const tooltipRows = [];
   const COLORS_V = [
-    { bg:'rgba(99,102,241,0.82)', border:'rgba(99,102,241,1)' },
-    { bg:'rgba(245,158,11,0.82)', border:'rgba(245,158,11,1)' },
-    { bg:'rgba(16,185,129,0.82)', border:'rgba(16,185,129,1)' },
+    { bg:'rgba(99,102,241,0.82)',  border:'rgba(99,102,241,1)'  },
+    { bg:'rgba(245,158,11,0.82)',  border:'rgba(245,158,11,1)'  },
+    { bg:'rgba(16,185,129,0.82)',  border:'rgba(16,185,129,1)'  },
   ];
+
+  CHANNELS_V.forEach(ch => {
+    const { won, lost } = chStats[ch];
+    if (!won.length) { velocities.push(0); tooltipRows.push('Ingen data'); return; }
+    const winRate  = won.length / (won.length + lost);
+    const avgDeal  = won.reduce((s,w) => s + w.amount,  0) / won.length;
+    const avgCycle = won.reduce((s,w) => s + w.cycle,   0) / won.length;
+    const vel      = Math.round((won.length * winRate * avgDeal) / avgCycle);
+    velocities.push(vel);
+    tooltipRows.push(
+      'Win rate: ' + (winRate*100).toFixed(0) + '% (' + won.length + 'W/' + lost + 'L)  |  ' +
+      'Gns. deal: DKK ' + fmt(Math.round(avgDeal)) + '  |  ' +
+      'Gns. cyklus: ' + avgCycle.toFixed(1) + ' mdr'
+    );
+  });
+
+  // Plugin that draws DKK value to the right of each horizontal bar
+  const valueLabelPlugin = {
+    id: 'velLabel',
+    afterDatasetsDraw(chart) {
+      const {ctx, data} = chart;
+      const meta = chart.getDatasetMeta(0);
+      meta.data.forEach((bar, idx) => {
+        const val = data.datasets[0].data[idx];
+        if (!val) return;
+        ctx.save();
+        ctx.font = 'bold 12px system-ui, sans-serif';
+        ctx.fillStyle = '#1e293b';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('DKK ' + fmt(val) + ' / md', bar.x + 8, bar.y);
+        ctx.restore();
+      });
+    }
+  };
+
   const canvas = document.getElementById('mktVelocityChart');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -2892,12 +2946,13 @@ function renderPipelineVelocity() {
     options: {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: true,
+      layout: { padding: { right: 200 } },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: c2 => ` DKK ${fmt(c2.raw)} / måned`,
-            afterLabel: c2 => ` ${tooltipExtras[c2.dataIndex]}`,
+            label: c2 => ' DKK ' + fmt(c2.raw) + ' / måned',
+            afterLabel: c2 => ' ' + tooltipRows[c2.dataIndex],
           }
         }
       },
@@ -2905,174 +2960,11 @@ function renderPipelineVelocity() {
         x: { beginAtZero: true, ticks: { callback: v => 'DKK ' + fmt(v) } },
         y: { grid: { display: false } }
       }
-    }
-  });
-}
-
-// ── Google Search Console OAuth + Charts ───────────────────────────────────
-let gscToken = '';
-let gscSite  = '';
-
-function gscConnect() {
-  const clientId = (document.getElementById('gscClientId')||{value:''}).value.trim();
-  const siteUrl  = (document.getElementById('gscSiteUrl')||{value:''}).value.trim();
-  if (!clientId) { gscSetStatus('Indsæt dit Google OAuth Client ID', 'err'); return; }
-  if (!siteUrl)  { gscSetStatus('Indsæt dit site URL (fx https://ekkosoftware.dk/)', 'err'); return; }
-  gscSite = siteUrl.replace(/\/+$/, '') + '/';
-  gscSetStatus('Åbner Google login…', '');
-  const tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: clientId,
-    scope: 'https://www.googleapis.com/auth/webmasters.readonly',
-    callback: (resp) => {
-      if (resp.error) { gscSetStatus('✗ Login fejlede: ' + resp.error, 'err'); return; }
-      gscToken = resp.access_token;
-      document.getElementById('gscConnectSection').style.display = 'none';
-      document.getElementById('gscCharts').style.display = '';
-      document.getElementById('gscConnectedAs').textContent = '✓ Forbundet til ' + gscSite;
-      gscFetch();
-    }
-  });
-  tokenClient.requestAccessToken();
-}
-
-function gscDisconnect() {
-  gscToken = '';
-  document.getElementById('gscConnectSection').style.display = '';
-  document.getElementById('gscCharts').style.display = 'none';
-  ['gscClicksChart','gscImpressionsChart','gscPositionChart'].forEach(id => destroyChart('gsc_' + id));
-  document.getElementById('gscQueriesTable').innerHTML = '';
-}
-
-function gscSetStatus(msg, type) {
-  const el = document.getElementById('gscStatus');
-  if (el) { el.textContent = msg; el.style.color = type === 'err' ? '#ef4444' : '#64748b'; }
-}
-
-async function gscFetch() {
-  if (!gscToken) return;
-  const days  = parseInt((document.getElementById('gscDays')||{value:'365'}).value) || 365;
-  const endDate   = new Date();
-  const startDate = new Date(); startDate.setDate(endDate.getDate() - days);
-  const fmt8 = d => d.toISOString().slice(0,10);
-
-  const baseBody = {
-    startDate: fmt8(startDate),
-    endDate:   fmt8(endDate),
-    rowLimit:  1000,
-  };
-
-  try {
-    // ── Clicks + Impressions over time ────────────────────────────────────
-    const timeResp = await fetch(
-      \`https://searchconsole.googleapis.com/webmasters/v3/sites/\${encodeURIComponent(gscSite)}/searchAnalytics/query\`,
-      {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + gscToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...baseBody, dimensions: ['date'] })
-      }
-    );
-    if (!timeResp.ok) throw new Error('API fejl: ' + timeResp.status + ' ' + await timeResp.text());
-    const timeData = await timeResp.json();
-    const rows = timeData.rows || [];
-    const dates      = rows.map(r => r.keys[0]);
-    const clicks     = rows.map(r => r.clicks);
-    const impressions = rows.map(r => r.impressions);
-    const positions  = rows.map(r => parseFloat(r.position.toFixed(1)));
-
-    gscRenderTimeChart('gscClicksChart',      dates, clicks,      'Klik',         'rgba(99,102,241,0.82)',  'rgba(99,102,241,1)');
-    gscRenderTimeChart('gscImpressionsChart', dates, impressions, 'Impressions',  'rgba(16,185,129,0.82)',  'rgba(16,185,129,1)');
-    gscRenderPositionChart('gscPositionChart', dates, positions);
-
-    // ── Top queries ───────────────────────────────────────────────────────
-    const qResp = await fetch(
-      \`https://searchconsole.googleapis.com/webmasters/v3/sites/\${encodeURIComponent(gscSite)}/searchAnalytics/query\`,
-      {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + gscToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...baseBody, dimensions: ['query'], rowLimit: 25 })
-      }
-    );
-    const qData = await qResp.json();
-    gscRenderQueriesTable(qData.rows || []);
-
-  } catch(err) {
-    gscSetStatus('✗ ' + err.message, 'err');
-    console.error(err);
-  }
-}
-
-function gscRenderTimeChart(canvasId, labels, data, label, bgColor, borderColor) {
-  const chartKey = 'gsc_' + canvasId;
-  destroyChart(chartKey);
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  charts[chartKey] = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{ label, data, backgroundColor: bgColor, borderColor, borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 }]
     },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
-      scales: {
-        x: { ticks: { maxTicksLimit: 8, font: { size: 10 } }, grid: { display: false } },
-        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
-      }
-    }
+    plugins: [valueLabelPlugin]
   });
 }
 
-function gscRenderPositionChart(canvasId, labels, data) {
-  const chartKey = 'gsc_' + canvasId;
-  destroyChart(chartKey);
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  charts[chartKey] = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{ label: 'Gns. placering', data, backgroundColor: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,1)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
-      scales: {
-        x: { ticks: { maxTicksLimit: 8, font: { size: 10 } }, grid: { display: false } },
-        y: { reverse: true, beginAtZero: false, ticks: { font: { size: 10 } } }
-      }
-    }
-  });
-}
-
-function gscRenderQueriesTable(rows) {
-  const wrap = document.getElementById('gscQueriesTable');
-  if (!wrap) return;
-  if (!rows.length) { wrap.innerHTML = '<p style="color:#94a3b8;font-size:13px;padding:8px 0">Ingen søgedata fundet.</p>'; return; }
-  const tableRows = rows.map((r, i) => `
-    <tr style="${i % 2 === 0 ? 'background:#f8fafc' : ''}">
-      <td style="padding:6px 10px;font-size:13px">${r.keys[0]}</td>
-      <td style="padding:6px 10px;text-align:right;font-weight:600;font-size:13px">${r.clicks}</td>
-      <td style="padding:6px 10px;text-align:right;font-size:13px">${r.impressions}</td>
-      <td style="padding:6px 10px;text-align:right;font-size:13px">${(r.ctr * 100).toFixed(1)}%</td>
-      <td style="padding:6px 10px;text-align:right;font-size:13px">${r.position.toFixed(1)}</td>
-    </tr>`).join('');
-  wrap.innerHTML = `
-    <table style="width:100%;border-collapse:collapse;font-size:13px">
-      <thead>
-        <tr style="border-bottom:2px solid #e2e8f0">
-          <th style="text-align:left;padding:6px 10px;color:#64748b;font-size:11px;text-transform:uppercase">Søgning</th>
-          <th style="text-align:right;padding:6px 10px;color:#64748b;font-size:11px;text-transform:uppercase">Klik</th>
-          <th style="text-align:right;padding:6px 10px;color:#64748b;font-size:11px;text-transform:uppercase">Impressions</th>
-          <th style="text-align:right;padding:6px 10px;color:#64748b;font-size:11px;text-transform:uppercase">CTR</th>
-          <th style="text-align:right;padding:6px 10px;color:#64748b;font-size:11px;text-transform:uppercase">Placering</th>
-        </tr>
-      </thead>
-      <tbody>${tableRows}</tbody>
-    </table>`;
-}
 
 // ── Init ──────────────────────────────────────────────────────────────────
 function updateCharts(){
@@ -3149,5 +3041,6 @@ document.addEventListener('DOMContentLoaded',init);
 <div id="insightTooltip"></div>
 <div id="mktKpiTooltip"></div>
 <div id="mktChannelTooltip"></div>
+<div id="mktQtrTooltip"></div>
 </body>
 </html>
