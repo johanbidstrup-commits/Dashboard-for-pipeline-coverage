@@ -74,20 +74,23 @@
 
   /* ── Shared dashboard tooltips ── */
   #channelTooltip, #coverageTooltip, #insightTooltip,
-  #mktKpiTooltip, #mktChannelTooltip, #mktQtrTooltip {
+  #mktKpiTooltip, #mktChannelTooltip, #mktQtrTooltip,
+  #salesKpiTooltip {
     display: none; position: fixed; z-index: 9999;
     background: #1a1a2e; color: #f8fafc; border-radius: 10px;
     padding: 0; box-shadow: 0 8px 32px rgba(0,0,0,0.35);
     font-size: 12px; pointer-events: auto; overflow: hidden;
   }
   #channelTooltip.visible, #coverageTooltip.visible, #insightTooltip.visible,
-  #mktKpiTooltip.visible, #mktChannelTooltip.visible, #mktQtrTooltip.visible { display: block; }
+  #mktKpiTooltip.visible, #mktChannelTooltip.visible, #mktQtrTooltip.visible,
+  #salesKpiTooltip.visible { display: block; }
   #channelTooltip   { min-width: 340px; max-width: 480px; }
   #coverageTooltip  { min-width: 380px; max-width: 520px; }
   #insightTooltip   { min-width: 300px; max-width: 380px; }
   #mktKpiTooltip    { min-width: 380px; max-width: 520px; }
   #mktChannelTooltip{ min-width: 360px; max-width: 500px; }
   #mktQtrTooltip    { min-width: 360px; max-width: 500px; }
+  #salesKpiTooltip  { min-width: 380px; max-width: 560px; }
   /* Coverage stats bar */
   .ct-stats-bar { display: flex; gap: 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
   .ct-stat-cell { flex: 1; padding: 8px 12px; border-right: 1px solid rgba(255,255,255,0.08); }
@@ -1261,7 +1264,7 @@ function readTargets() {
 
 // ── KPIs ──────────────────────────────────────────────────────────────────
 function renderKPIs() {
-  const open=RAW_DEALS.filter(d=>d.isOpen);
+  const open=RAW_DEALS.filter(d=>d.isOpen && d.stage!=='MQL');
   const won =RAW_DEALS.filter(d=>d.isClosedWon);
   const lost=RAW_DEALS.filter(d=>d.isClosedLost);
   const openVal=open.reduce((s,d)=>s+d.amount,0);
@@ -1277,11 +1280,14 @@ function renderKPIs() {
   const curQ=qWinRate('Q1 2026'), prevQ=qWinRate('Q4 2025');
   const curQRate=curQ.rate, prevQRate=prevQ.rate, curQDiff=curQRate-prevQRate;
 
-  // YTD 2026: Jan 1 – Mar 14, 2026
-  const ytd26=RAW_DEALS.filter(d=>d.createDate&&d.createDate>='2026-01-01'&&d.createDate<='2026-03-14');
+  // YTD: dynamic from max data date, excluding MQL
+  const _ytdCut26 = getYtdCutoff();
+  const _ytdCut25 = getYtdCutoffPrevYear(_ytdCut26);
+  const _ytdY26   = _ytdCut26.slice(0,4);
+  const _ytdY25   = _ytdCut25.slice(0,4);
+  const ytd26=RAW_DEALS.filter(d=>d.createDate&&d.createDate>=_ytdY26+'-01-01'&&d.createDate<=_ytdCut26&&d.stage!=='MQL');
   const ytd26Val=ytd26.reduce((s,d)=>s+d.amount,0);
-  // Same period 2025: Jan 1 – Mar 14, 2025
-  const ytd25=RAW_DEALS.filter(d=>d.createDate&&d.createDate>='2025-01-01'&&d.createDate<='2025-03-14');
+  const ytd25=RAW_DEALS.filter(d=>d.createDate&&d.createDate>=_ytdY25+'-01-01'&&d.createDate<=_ytdCut25&&d.stage!=='MQL');
   const ytd25Val=ytd25.reduce((s,d)=>s+d.amount,0);
 
   const yoyDiff=ytd26Val-ytd25Val;
@@ -1290,9 +1296,13 @@ function renderKPIs() {
   const yoyArrow=yoyDiff>=0?'▲':'▼';
   const yoyCls=yoyDiff>=0?'yoy-up':'yoy-down';
 
+  const openSorted  = open.slice().sort((a,b) => b.amount - a.amount);
+  const ytd26Sorted = ytd26.slice().sort((a,b) => b.amount - a.amount);
+  _salesKpiData = { open: openSorted, ytd26: ytd26Sorted };
+
   document.getElementById('kpiBar').innerHTML = `
-    <div class="kpi-card">
-      <div class="kpi-label">Open Pipeline</div>
+    <div class="kpi-card" data-skpi="open" style="cursor:pointer;">
+      <div class="kpi-label">Open Pipeline &#x1F50D;</div>
       <div class="kpi-value">DKK ${fmt(openVal)}</div>
       <div class="kpi-sub">${open.length} active deals</div>
     </div>
@@ -1310,15 +1320,16 @@ function renderKPIs() {
         <span class="yoy-label">vs Q4 2025 (${prevQRate.toFixed(0)}%)</span>
       </div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Pipeline Gen 2026 (YTD)</div>
+    <div class="kpi-card" data-skpi="ytd26" style="cursor:pointer;">
+      <div class="kpi-label">Pipeline Gen 2026 (YTD) &#x1F50D;</div>
       <div class="kpi-value">DKK ${fmt(ytd26Val)}</div>
-      <div class="kpi-sub">${ytd26.length} deals · Jan 1 – Mar 14</div>
+      <div class="kpi-sub">${ytd26.length} deals · Jan 1 – ${fmtYtdLabel(_ytdCut26)}</div>
       <div class="kpi-yoy">
         <span class="${yoyCls}">${yoyArrow} ${yoyPct!==null?Math.abs(yoyPct).toFixed(0)+'%':'—'}</span>
         <span class="yoy-label">vs same period 2025 (DKK ${fmt(ytd25Val)}, ${ytd25.length} deals)</span>
       </div>
     </div>`;
+  attachSalesKpiTooltips();
 }
 
 // ── Coverage ──────────────────────────────────────────────────────────────
@@ -1326,16 +1337,15 @@ function renderKPIs() {
 let coverageTooltipData = {};
 let insightTooltipData  = {};
 let _cvTooltipHandlersAttached = false;
+let _salesKpiData = {};
+let _salesKpiHandlersAttached = false;
 
-function positionAnyTooltip(el, clientX, clientY) {
+function positionAnyTooltip(el) {
   const margin = 8;
   const vpW = window.innerWidth, vpH = window.innerHeight;
   const tw = el.offsetWidth, th = el.offsetHeight;
-  let left = clientX + 14, top = clientY - 20;
-  if (left + tw > vpW - margin) left = clientX - tw - 14;
-  if (left < margin)            left = margin;
-  if (top  + th > vpH - margin) top  = vpH - th - margin;
-  if (top  < margin)            top  = margin;
+  const left = Math.max(margin, Math.round((vpW - tw) / 2));
+  const top  = Math.max(margin, Math.round((vpH - th) / 2));
   el.style.left = left + 'px';
   el.style.top  = top  + 'px';
 }
@@ -1344,12 +1354,107 @@ function showAnyTooltip(el, html, clientX, clientY, pinned) {
   el.innerHTML = html;
   el._pinned = pinned;
   el.classList.add('visible');
-  positionAnyTooltip(el, clientX, clientY);
+  positionAnyTooltip(el);
 }
 
 function closeBtn(id) {
   return `<button class="ct-close" onclick="var t=document.getElementById('${id}');t.classList.remove('visible');t._pinned=false;">✕</button>`;
 }
+// ── Sales KPI tooltip ──────────────────────────────────────────────────────
+function buildSalesKpiTooltip(type) {
+  const deals = _salesKpiData[type] || [];
+  const label  = type === 'open' ? 'Open Pipeline' : 'Pipeline Gen 2026 (YTD)';
+  const total  = deals.reduce((s,d) => s+d.amount, 0);
+  const color  = '#818cf8';
+
+  const rows = deals.map(d => {
+    const name  = (d.name||'—').length>38 ? (d.name||'—').slice(0,36)+'…' : (d.name||'—');
+    const src   = d.source || '—';
+    const stg   = d.stage  || '—';
+    const amt   = 'DKK ' + (d.amount||0).toLocaleString('da-DK');
+    const cq    = d.closeQuarter || '—';
+    return `<tr>
+      <td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</td>
+      <td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;font-weight:700;color:${color};white-space:nowrap;">${amt}</td>
+      <td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);color:#94a3b8;white-space:nowrap;">${src}</td>
+      <td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);color:#94a3b8;white-space:nowrap;">${stg}</td>
+      <td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.05);color:#94a3b8;white-space:nowrap;">${cq}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <div style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-weight:800;font-size:13px;color:${color};">${label}</span>
+      ${closeBtn('salesKpiTooltip')}
+    </div>
+    <div class="ct-stats-bar">
+      <div class="ct-stat-cell">
+        <div class="ct-stat-big" style="color:${color};">DKK ${total.toLocaleString('da-DK')}</div>
+        <div class="ct-stat-sub">Total</div>
+      </div>
+      <div class="ct-stat-cell">
+        <div class="ct-stat-big">${deals.length}</div>
+        <div class="ct-stat-sub">Deals</div>
+      </div>
+    </div>
+    <div class="ct-body" style="max-height:320px;overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:rgba(255,255,255,0.04);">
+            <th style="padding:4px 8px;text-align:left;font-size:10px;opacity:0.45;font-weight:600;text-transform:uppercase;">Deal</th>
+            <th style="padding:4px 8px;text-align:right;font-size:10px;opacity:0.45;font-weight:600;text-transform:uppercase;">Amount</th>
+            <th style="padding:4px 8px;text-align:left;font-size:10px;opacity:0.45;font-weight:600;text-transform:uppercase;">Source</th>
+            <th style="padding:4px 8px;text-align:left;font-size:10px;opacity:0.45;font-weight:600;text-transform:uppercase;">Stage</th>
+            <th style="padding:4px 8px;text-align:left;font-size:10px;opacity:0.45;font-weight:600;text-transform:uppercase;">Close Q</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function attachSalesKpiTooltips() {
+  if (_salesKpiHandlersAttached) return;
+  _salesKpiHandlersAttached = true;
+  const bar = document.getElementById('kpiBar');
+  const tt  = document.getElementById('salesKpiTooltip');
+  if (!bar || !tt) return;
+
+  bar.addEventListener('mouseover', e => {
+    if (tt._pinned) return;
+    const card = e.target.closest('[data-skpi]');
+    if (!card) return;
+    const type = card.dataset.skpi;
+    showAnyTooltip(tt, buildSalesKpiTooltip(type), e.clientX, e.clientY, false);
+  });
+
+  bar.addEventListener('mouseleave', e => {
+    if (tt._pinned) return;
+    tt.classList.remove('visible');
+  });
+  bar.addEventListener('click', e => {
+    const card = e.target.closest('[data-skpi]');
+    if (!card) return;
+    const type = card.dataset.skpi;
+    if (tt._pinned && tt.dataset.pinnedType === type) {
+      tt.classList.remove('visible');
+      tt._pinned = false;
+      delete tt.dataset.pinnedType;
+    } else {
+      showAnyTooltip(tt, buildSalesKpiTooltip(type), e.clientX, e.clientY, true);
+      tt.dataset.pinnedType = type;
+    }
+  });
+  bar.addEventListener('touchstart', e => {
+    const card = e.target.closest('[data-skpi]');
+    if (!card) return;
+    const type = card.dataset.skpi;
+    const t = e.touches[0];
+    showAnyTooltip(tt, buildSalesKpiTooltip(type), t.clientX, t.clientY, true);
+    tt.dataset.pinnedType = type;
+  }, { passive: true });
+}
+
 
 // ── Coverage tooltip builder ───────────────────────────────────────────────
 function buildCoverageTooltip(q) {
@@ -1450,12 +1555,12 @@ function renderCoverageChart() {
   readTargets();
   destroyChart('coverage');
   const byCloseQ={};
-  RAW_DEALS.filter(d=>d.isOpen&&d.closeQuarter).forEach(d=>{
+  RAW_DEALS.filter(d=>d.isOpen&&d.stage!=='MQL'&&d.closeQuarter).forEach(d=>{
     byCloseQ[d.closeQuarter]=(byCloseQ[d.closeQuarter]||0)+d.amount;
   });
   // Build deal lookup for tooltip
   const dealsByCloseQ = {};
-  RAW_DEALS.filter(d=>d.isOpen&&d.closeQuarter).forEach(d=>{
+  RAW_DEALS.filter(d=>d.isOpen&&d.stage!=='MQL'&&d.closeQuarter).forEach(d=>{
     if(!dealsByCloseQ[d.closeQuarter]) dealsByCloseQ[d.closeQuarter]=[];
     dealsByCloseQ[d.closeQuarter].push(d);
   });
@@ -1889,6 +1994,7 @@ function renderYoYPipelineChart() {
   };
   const byYearQ={};
   RAW_DEALS.forEach(d=>{
+    if(d.stage==='MQL') return;
     if(!d.createQuarter) return;
     const [q,y]=d.createQuarter.split(' ');
     if(!YEARS.includes(y)) return;
@@ -2118,6 +2224,7 @@ function renderChannelChart() {
   const dealMap = {};  // quarter|channel → [deals]
 
   RAW_DEALS.forEach(d => {
+    if (d.stage === 'MQL') return;
     const ch = channel(d.source);
     if (!ch) return;
     let q = null;
@@ -2250,19 +2357,8 @@ function renderChannelChart() {
       <div class="ct-body">${rows}</div>`;
   }
 
-  function ctPosition(clientX, clientY) {
-    // Clamp tooltip to all 4 viewport edges
-    const margin = 8;
-    const vpW = window.innerWidth, vpH = window.innerHeight;
-    const tw = tooltip.offsetWidth,  th = tooltip.offsetHeight;
-    let left = clientX + 14;
-    let top  = clientY - 20;
-    if (left + tw > vpW - margin) left = clientX - tw - 14; // flip left
-    if (left < margin)            left = margin;             // clamp left edge
-    if (top  + th > vpH - margin) top  = vpH - th - margin; // clamp bottom
-    if (top  < margin)            top  = margin;             // clamp top
-    tooltip.style.left = left + 'px';
-    tooltip.style.top  = top  + 'px';
+  function ctPosition() {
+    positionAnyTooltip(tooltip);
   }
 
   function ctShow(clientX, clientY, pts, pinned) {
@@ -2276,7 +2372,7 @@ function renderChannelChart() {
     tooltip.innerHTML = ctBuildContent(ch, q, deals, total, quarterTotal);
     tooltip._pinned = pinned;
     tooltip.classList.add('visible');
-    ctPosition(clientX, clientY);
+    ctPosition();
   }
 
   // ── Desktop: mousemove / mouseleave with hover-over-tooltip support ──────
@@ -2368,7 +2464,7 @@ function attachMktKpiTooltips() {
   if (!bar || !tt) return;
 
   function buildMktKpiTooltip(kpi) {
-    const titles = { mql: 'MQL i kø', ibOpen: 'Inbound Open Pipeline', ytd26: 'Pipeline Gen 2026 YTD' };
+    const titles = { mql: 'MQL i kø', ytd26: 'Inbound Pipeline (YTD)' };
     const colors = { mql: '#818cf8', ytd26: '#10b981', ibOpen: '#fbbf24' };
     const deals  = (_mktKpiData[kpi] || []).slice().sort((a,b) => b.amount - a.amount);
     const total  = deals.reduce((s,d) => s + d.amount, 0);
@@ -2405,21 +2501,16 @@ function attachMktKpiTooltips() {
     tt.innerHTML = buildMktKpiTooltip(card.dataset.kpi);
     tt._pinned = false;
     tt.classList.add('visible');
-    positionAnyTooltip(tt, e.clientX, e.clientY);
+    positionAnyTooltip(tt);
   });
-  bar.addEventListener('mousemove', e => {
-    if (tt._pinned) return;
-    const card = e.target.closest('[data-kpi]');
-    if (!card) { tt.classList.remove('visible'); return; }
-    positionAnyTooltip(tt, e.clientX, e.clientY);
-  });
+
   bar.addEventListener('mouseleave', () => { if (!tt._pinned) tt.classList.remove('visible'); });
   bar.addEventListener('click', e => {
     const card = e.target.closest('[data-kpi]');
     if (!card) return;
     tt.innerHTML = buildMktKpiTooltip(card.dataset.kpi);
     tt._pinned = true; tt.classList.add('visible');
-    positionAnyTooltip(tt, e.clientX, e.clientY);
+    positionAnyTooltip(tt);
   });
   document.addEventListener('click', e => {
     if (!tt._pinned) return;
@@ -2434,7 +2525,7 @@ function attachMktKpiTooltips() {
     tt.innerHTML = buildMktKpiTooltip(card.dataset.kpi);
     tt._pinned = true;
     tt.classList.add('visible');
-    positionAnyTooltip(tt, touch.clientX, touch.clientY);
+    positionAnyTooltip(tt);
   }, { passive: true });
   document.addEventListener('touchstart', e => {
     if (!tt._pinned) return;
@@ -2445,46 +2536,55 @@ function attachMktKpiTooltips() {
 }
 
 function renderMarketingKPIs() {
-  const isInbound = d => MKT_SOURCES.includes(d.source);
-  const mql     = RAW_DEALS.filter(d => d.stage === 'MQL');
-  const ibOpen  = RAW_DEALS.filter(d => isInbound(d) && d.isOpen);
-  const ibWon   = RAW_DEALS.filter(d => isInbound(d) && d.isClosedWon);
-  const ibLost  = RAW_DEALS.filter(d => isInbound(d) && d.isClosedLost);
-  const ibOpenVal = ibOpen.reduce((s,d) => s + d.amount, 0);
-  const ibWonVal  = ibWon.reduce((s,d) => s + d.amount, 0);
-  const ibWinRate = (ibWon.length + ibLost.length) > 0
-    ? ibWon.length / (ibWon.length + ibLost.length) * 100 : 0;
+  // Inbound = MKT_SOURCES, non-MQL stage
+  const isMktSrc = d => MKT_SOURCES.includes(d.source);
 
-  const ytd26 = RAW_DEALS.filter(d => isInbound(d) && d.createDate >= '2026-01-01' && d.createDate <= '2026-03-14');
-  const ytd25 = RAW_DEALS.filter(d => isInbound(d) && d.createDate >= '2025-01-01' && d.createDate <= '2025-03-14');
-  const ytd26Val = ytd26.reduce((s,d) => s + d.amount, 0);
-  const ytd25Val = ytd25.reduce((s,d) => s + d.amount, 0);
+  // KPI 1: Inbound Pipeline YTD (MKT_SOURCES, excl. MQL stage)
+  const _cut26 = getYtdCutoff();
+  const _cut25 = getYtdCutoffPrevYear(_cut26);
+  const _y26   = _cut26.slice(0, 4);
+  const _y25   = _cut25.slice(0, 4);
+  const ytd26 = RAW_DEALS.filter(d =>
+    isMktSrc(d) && d.stage !== 'MQL' && d.createDate &&
+    d.createDate >= _y26 + '-01-01' && d.createDate <= _cut26);
+  const ytd25 = RAW_DEALS.filter(d =>
+    isMktSrc(d) && d.stage !== 'MQL' && d.createDate &&
+    d.createDate >= _y25 + '-01-01' && d.createDate <= _cut25);
+  const ytd26Val = ytd26.reduce((s, d) => s + d.amount, 0);
+  const ytd25Val = ytd25.reduce((s, d) => s + d.amount, 0);
   const yoyDiff  = ytd26Val - ytd25Val;
   const yoyPct   = ytd25Val > 0 ? (yoyDiff / ytd25Val * 100) : null;
   const yoyArrow = yoyDiff >= 0 ? '▲' : '▼';
   const yoyCls   = yoyDiff >= 0 ? 'yoy-up' : 'yoy-down';
 
-  _mktKpiData = { mql, ibOpen, ytd26 };
+  // KPI 2: MQL queue
+  const mql    = RAW_DEALS.filter(d => d.stage === 'MQL');
+  const mqlVal = mql.reduce((s, d) => s + d.amount, 0);
+
+  // KPI 3: Samlet = Inbound YTD + MQL
+  const samletVal = ytd26Val + mqlVal;
+
+  _mktKpiData = { mql, ytd26 };
 
   document.getElementById('mktKpiBar').innerHTML = `
-    <div class="kpi-card" data-kpi="mql" style="cursor:pointer" title="Hover for deals">
-      <div class="kpi-label">MQL i kø 🔍</div>
-      <div class="kpi-value">${mql.length}</div>
-      <div class="kpi-sub">DKK ${fmt(mql.reduce((s,d) => s+d.amount, 0))} i pipeline</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Inbound Win Rate</div>
-      <div class="kpi-value">${ibWinRate.toFixed(0)}%</div>
-      <div class="kpi-sub">${ibWon.length}W / ${ibLost.length}L · DKK ${fmt(ibWonVal)} won</div>
-    </div>
-    <div class="kpi-card" data-kpi="ytd26" style="cursor:pointer" title="Hover for deals">
-      <div class="kpi-label">Inbound Pipeline Gen 2026 (YTD) 🔍</div>
+    <div class="kpi-card" data-kpi="ytd26" style="cursor:pointer" title="Klik for deals">
+      <div class="kpi-label">Inbound Pipeline (YTD) 🔍</div>
       <div class="kpi-value">DKK ${fmt(ytd26Val)}</div>
-      <div class="kpi-sub">${ytd26.length} deals · Jan 1 – Mar 14</div>
+      <div class="kpi-sub">${ytd26.length} deals · Jan 1 – ${fmtYtdLabel(_cut26)}</div>
       <div class="kpi-yoy">
         <span class="${yoyCls}">${yoyArrow} ${yoyPct !== null ? Math.abs(yoyPct).toFixed(0) + '%' : '—'}</span>
-        <span class="yoy-label">vs same period 2025 (DKK ${fmt(ytd25Val)})</span>
+        <span class="yoy-label">vs samme periode 2025 (DKK ${fmt(ytd25Val)}, ${ytd25.length} deals)</span>
       </div>
+    </div>
+    <div class="kpi-card" data-kpi="mql" style="cursor:pointer" title="Klik for deals">
+      <div class="kpi-label">MQL i kø 🔍</div>
+      <div class="kpi-value">DKK ${fmt(mqlVal)}</div>
+      <div class="kpi-sub">${mql.length} deals i MQL stage</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Samlet Marketing Pipeline (YTD)</div>
+      <div class="kpi-value">DKK ${fmt(samletVal)}</div>
+      <div class="kpi-sub">Inbound ${ytd26.length} + MQL ${mql.length} = ${ytd26.length + mql.length} deals</div>
     </div>`;
 
   attachMktKpiTooltips();
@@ -2525,54 +2625,66 @@ function renderMktChannelChart() {
   const INBOUND_SET  = new Set(MKT_SOURCES);
   const OUTBOUND_SET = new Set(['Salgsbrev','Outbound','We Rock Sales','Hjælp-til-salg']);
   const PARTNER_SET  = new Set(['Partner']);
-  const CHANNELS = ['Inbound','Outbound','Partner'];
+
+  // 4 channels — MQL stacks on top of Inbound
+  const CHANNELS   = ['Inbound', 'MQL', 'Outbound', 'Partner'];
+  const CHAN_STACK  = { Inbound: 'inbound', MQL: 'inbound', Outbound: 'outbound', Partner: 'partner' };
+  const COLORS = {
+    Inbound:  { bg: 'rgba(99,102,241,0.80)',  border: 'rgba(99,102,241,1)',  text: '#818cf8' },
+    MQL:      { bg: 'rgba(167,139,250,0.90)', border: 'rgba(139,92,246,1)',  text: '#a78bfa' },
+    Outbound: { bg: 'rgba(245,158,11,0.82)',  border: 'rgba(245,158,11,1)',  text: '#fbbf24' },
+    Partner:  { bg: 'rgba(16,185,129,0.82)',  border: 'rgba(16,185,129,1)',  text: '#34d399' },
+  };
+
   function channel(src) {
     if (INBOUND_SET.has(src))  return 'Inbound';
     if (OUTBOUND_SET.has(src)) return 'Outbound';
     if (PARTNER_SET.has(src))  return 'Partner';
     return null;
   }
+
   const metric = (document.getElementById('mktChShow')||{value:'amount'}).value;
   const fromYr = parseInt((document.getElementById('mktChFrom')||{value:'2025'}).value) || 2025;
   const byQ = {}, dealMap = {};
+
   RAW_DEALS.forEach(d => {
-    const ch = channel(d.source);
+    // MQL always goes to 'MQL' bucket; others by source
+    const ch = d.stage === 'MQL' ? 'MQL' : channel(d.source);
     if (!ch) return;
     const q = d.createQuarter;
     if (!q) return;
     if (parseInt(q.split(' ')[1]) < fromYr) return;
-    if (!byQ[q]) byQ[q] = {Inbound:0, Outbound:0, Partner:0};
+    if (!byQ[q]) byQ[q] = { Inbound: 0, MQL: 0, Outbound: 0, Partner: 0 };
     byQ[q][ch] += metric === 'amount' ? d.amount : 1;
     const key = q + '|' + ch;
     if (!dealMap[key]) dealMap[key] = [];
     dealMap[key].push(d);
   });
-  Object.values(dealMap).forEach(arr => arr.sort((a,b) => b.amount - a.amount));
+  Object.values(dealMap).forEach(arr => arr.sort((a, b) => b.amount - a.amount));
   const quarters = sortQuarters(Object.keys(byQ));
-  const COLORS = {
-    Inbound:  { bg:'rgba(99,102,241,0.82)',  border:'rgba(99,102,241,1)',  text:'#818cf8' },
-    Outbound: { bg:'rgba(245,158,11,0.82)',  border:'rgba(245,158,11,1)',  text:'#fbbf24' },
-    Partner:  { bg:'rgba(16,185,129,0.82)',  border:'rgba(16,185,129,1)',  text:'#34d399' },
-  };
 
   const ctx = document.getElementById('mktChannelChart').getContext('2d');
 
+  // % label plugin — shows combined Inbound+MQL % for MQL bar; individual % for Outbound/Partner
   const mktChPctPlugin = {
     id: 'mktChPct',
     afterDatasetsDraw(chart) {
-      const {ctx: c, data} = chart;
+      const { ctx: c, data } = chart;
       data.datasets.forEach((dataset, di) => {
+        if (di === 0) return; // skip base Inbound — its share shown via MQL bar
         const meta = chart.getDatasetMeta(di);
         if (meta.hidden) return;
         meta.data.forEach((bar, idx) => {
-          const val = dataset.data[idx] || 0;
-          if (!val) return;
+          // For MQL bar: numerator = Inbound + MQL (total inbound share of quarter)
+          const numerator = di === 1
+            ? (data.datasets[0].data[idx] || 0) + (dataset.data[idx] || 0)
+            : (dataset.data[idx] || 0);
+          if (!numerator) return;
           const total = data.datasets.reduce((s, ds, dsi) => {
-            const m = chart.getDatasetMeta(dsi);
-            return m.hidden ? s : s + (ds.data[idx] || 0);
+            return chart.getDatasetMeta(dsi).hidden ? s : s + (ds.data[idx] || 0);
           }, 0);
           if (!total) return;
-          const pct = Math.round(val / total * 100);
+          const pct = Math.round(numerator / total * 100);
           if (!pct) return;
           c.save();
           c.font = 'bold 10px system-ui, sans-serif';
@@ -2591,11 +2703,13 @@ function renderMktChannelChart() {
     data: {
       labels: quarters,
       datasets: CHANNELS.map(ch => ({
-        label: ch,
-        data: quarters.map(q => byQ[q]?.[ch] || 0),
+        label: ch === 'Inbound' ? 'Inbound (non-MQL)' : ch,
+        data:  quarters.map(q => byQ[q]?.[ch] || 0),
         backgroundColor: COLORS[ch].bg,
-        borderColor: COLORS[ch].border,
-        borderWidth: 1, borderRadius: 4,
+        borderColor:     COLORS[ch].border,
+        borderWidth: 1,
+        borderRadius: ch === 'MQL' ? 3 : 4,
+        stack: CHAN_STACK[ch],
       }))
     },
     options: {
@@ -2607,6 +2721,7 @@ function renderMktChannelChart() {
       scales: {
         x: { grid: { display: false } },
         y: {
+          stacked: true,
           beginAtZero: true,
           ticks: { callback: v => metric === 'amount' ? 'DKK ' + fmt(v) : v }
         }
@@ -2615,28 +2730,37 @@ function renderMktChannelChart() {
     plugins: [mktChPctPlugin]
   });
 
-  // HTML tooltip (mktChannelTooltip)
+  // ── HTML tooltip ─────────────────────────────────────────────────────────
   const mctCanvas  = ctx.canvas;
   const mctTooltip = document.getElementById('mktChannelTooltip');
   let mctHideTimer = null;
 
-  function closeMctTooltip() { var t=document.getElementById('mktChannelTooltip'); t.classList.remove('visible'); t._pinned=false; }
-  function mctBuildContent(ch, q, deals, total, quarterTotal) {
+  function closeMctTooltip() {
+    var t = document.getElementById('mktChannelTooltip');
+    t.classList.remove('visible'); t._pinned = false;
+  }
+
+  function mctBuildContent(ch, q, deals, total) {
     const chColor = COLORS[ch]?.text || '#fff';
-    const isAmt = metric === 'amount';
+    const isAmt   = metric === 'amount';
+    const quarterTotal = CHANNELS.reduce((s, c) => s + (byQ[q]?.[c] || 0), 0);
+    const pct = quarterTotal > 0 ? Math.round(total / quarterTotal * 100) : null;
+    const pctBadge = pct !== null
+      ? `<span style="background:${chColor}22;color:${chColor};font-weight:700;font-size:12px;padding:2px 8px;border-radius:99px;margin-left:4px">${pct}%</span>`
+      : '';
     const rows = deals.map(d => {
-      const aC = d.stage === 'MQL' ? '#818cf8' : '#10b981';
+      const aC = d.stage === 'MQL' ? '#a78bfa' : '#10b981';
       return '<div class="ct-row">' +
-      '<span class="ct-deal-name" title="' + d.name + '">' + d.name + '</span>' +
-      '<span class="ct-amt" style="color:' + aC + '">' + (isAmt && d.amount ? 'DKK ' + fmtFull(d.amount) : '—') + '</span>' +
-      '<span class="ct-src">' + d.source + '</span>' +
-      '<span class="ct-date">' + (d.createDate ? d.createDate.split('-').reverse().join('/') : '—') + '</span>' +
-      '</div>';
-    }).join('');
+        '<span class="ct-deal-name" title="' + d.name + '">' + d.name + '</span>' +
+        '<span class="ct-amt" style="color:' + aC + '">' + (isAmt && d.amount ? 'DKK\u00a0' + fmtFull(d.amount) : '—') + '</span>' +
+        '<span class="ct-src">' + d.source + '</span>' +
+        '<span class="ct-date">' + (d.createDate ? d.createDate.split('-').reverse().join('/') : '—') + '</span>' +
+        '</div>';
+    }).join('') || '<div style="padding:10px 14px;opacity:0.4">Ingen deals</div>';
     return '<div class="ct-header">' +
-      '<span class="ct-title" style="color:' + chColor + '">' + ch + ' · ' + q + '</span>' +
-      '<span class="ct-total">' + (isAmt ? 'DKK ' + fmtFull(total) + ' · ' : '') + deals.length + ' deal' + (deals.length!==1?'s':'') + '</span>' +
-      '<button class="ct-close" onclick="closeMctTooltip()">✕</button>' +
+      '<span class="ct-title" style="color:' + chColor + '">' + ch + ' · ' + q + '</span>' + pctBadge +
+      '<span class="ct-total">' + (isAmt ? 'DKK\u00a0' + fmtFull(total) + ' · ' : '') + deals.length + ' deal' + (deals.length !== 1 ? 's' : '') + '</span>' +
+      '<button class="ct-close" onclick="var t=document.getElementById(\'mktChannelTooltip\');t.classList.remove(\'visible\');t._pinned=false;">✕</button>' +
       '</div>' +
       '<div class="ct-col-hdr"><span>Deal name</span><span style="text-align:right">Amount</span><span>Source</span><span style="text-align:right">Created</span></div>' +
       '<div class="ct-body">' + rows + '</div>';
@@ -2644,22 +2768,21 @@ function renderMktChannelChart() {
 
   function mctShow(clientX, clientY, pts, pinned) {
     if (!pts.length) return;
-    const {datasetIndex, index} = pts[0];
-    const ch = CHANNELS[datasetIndex];
-    const q  = quarters[index];
+    const { datasetIndex, index } = pts[0];
+    const ch    = CHANNELS[datasetIndex];
+    const q     = quarters[index];
     const deals = dealMap[q + '|' + ch] || [];
     const total = byQ[q]?.[ch] || 0;
-    const quarterTotal = CHANNELS.reduce((s, c) => s + (byQ[q]?.[c] || 0), 0);
-    mctTooltip.innerHTML = mctBuildContent(ch, q, deals, total, quarterTotal);
-    mctTooltip._pinned = pinned;
+    mctTooltip.innerHTML = mctBuildContent(ch, q, deals, total);
+    mctTooltip._pinned   = pinned;
     mctTooltip.classList.add('visible');
-    positionAnyTooltip(mctTooltip, clientX, clientY);
+    positionAnyTooltip(mctTooltip);
   }
 
   mctCanvas.addEventListener('mousemove', e => {
     if (mctTooltip._pinned) return;
     clearTimeout(mctHideTimer);
-    const pts = charts['mktChannel'].getElementsAtEventForMode(e, 'nearest', {intersect: true}, false);
+    const pts = charts['mktChannel'].getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
     if (!pts.length) { mctHideTimer = setTimeout(() => { if (!mctTooltip._pinned) mctTooltip.classList.remove('visible'); }, 80); return; }
     mctShow(e.clientX, e.clientY, pts, false);
   });
@@ -2668,20 +2791,22 @@ function renderMktChannelChart() {
     mctHideTimer = setTimeout(() => { if (!mctTooltip._pinned) mctTooltip.classList.remove('visible'); }, 180);
   });
   mctCanvas.addEventListener('click', e => {
-    const pts = charts['mktChannel'].getElementsAtEventForMode(e, 'nearest', {intersect: true}, false);
+    const pts = charts['mktChannel'].getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
     if (!pts.length) return;
     mctShow(e.clientX, e.clientY, pts, true);
   });
   document.addEventListener('click', e => {
     if (!mctTooltip._pinned) return;
-    if (!mctTooltip.contains(e.target) && e.target !== mctCanvas) { mctTooltip.classList.remove('visible'); mctTooltip._pinned = false; }
+    if (!mctTooltip.contains(e.target) && e.target !== mctCanvas) {
+      mctTooltip.classList.remove('visible'); mctTooltip._pinned = false;
+    }
   });
   mctTooltip.addEventListener('mouseenter', () => clearTimeout(mctHideTimer));
   mctTooltip.addEventListener('mouseleave', () => { if (!mctTooltip._pinned) mctTooltip.classList.remove('visible'); });
   mctCanvas.addEventListener('touchstart', e => {
     const touch = e.touches[0];
     const fakeEvt = new MouseEvent('mousemove', { clientX: touch.clientX, clientY: touch.clientY, bubbles: true });
-    const pts = charts['mktChannel'].getElementsAtEventForMode(fakeEvt, 'nearest', {intersect: true}, false);
+    const pts = charts['mktChannel'].getElementsAtEventForMode(fakeEvt, 'nearest', { intersect: true }, false);
     if (!pts.length) { mctTooltip.classList.remove('visible'); mctTooltip._pinned = false; return; }
     e.preventDefault();
     mctShow(touch.clientX, touch.clientY, pts, true);
@@ -2691,7 +2816,7 @@ function renderMktChannelChart() {
     if (!mctTooltip.contains(e.target) && e.target !== mctCanvas) {
       mctTooltip.classList.remove('visible'); mctTooltip._pinned = false;
     }
-  }, { passive: true });
+  });
 }
 
 function renderMktSourceChart() {
@@ -2818,53 +2943,72 @@ function renderMktWinRate() {
 
 function renderMktByQuarterChart() {
   destroyChart('mktQtr');
-  const YEARS  = [2024, 2025, 2026];
-  const qLabels = ['Q1','Q2','Q3','Q4'];
-  const byYrQ  = {};
-  const dealMap = {};
-  YEARS.forEach(yr => { byYrQ[yr] = {}; qLabels.forEach(q => { byYrQ[yr][q]=0; }); });
+  const YEARS   = [2024, 2025, 2026];
+  const qLabels = ['Q1', 'Q2', 'Q3', 'Q4'];
+  const MQL_BG     = 'rgba(167,139,250,0.85)';
+  const MQL_BORDER = 'rgba(139,92,246,1)';
+
+  // Separate non-MQL and MQL amounts per year/quarter
+  const byYrQ    = {};  // non-MQL
+  const byYrQMQL = {};  // MQL only
+  const dealMap    = {};
+  const dealMapMQL = {};
+  YEARS.forEach(yr => {
+    byYrQ[yr]    = {}; byYrQMQL[yr] = {};
+    qLabels.forEach(q => { byYrQ[yr][q] = 0; byYrQMQL[yr][q] = 0; });
+  });
 
   RAW_DEALS.forEach(d => {
-    if (!MKT_SOURCES.includes(d.source)) return;
+    if (!MKT_SOURCES.includes(d.source) && d.stage !== 'MQL') return;
     const q = d.createQuarter;
     if (!q) return;
-    const parts = q.split(' ');
+    const parts  = q.split(' ');
     const qLabel = parts[0];
     const yr     = parseInt(parts[1]);
     if (!YEARS.includes(yr) || !qLabels.includes(qLabel)) return;
-    byYrQ[yr][qLabel] += d.amount;
-    const key = yr + '|' + qLabel;
-    if (!dealMap[key]) dealMap[key] = [];
-    dealMap[key].push(d);
+
+    if (d.stage === 'MQL') {
+      byYrQMQL[yr][qLabel] += d.amount;
+      const key = yr + '|' + qLabel + '|mql';
+      if (!dealMapMQL[key]) dealMapMQL[key] = [];
+      dealMapMQL[key].push(d);
+    } else {
+      byYrQ[yr][qLabel] += d.amount;
+      const key = yr + '|' + qLabel;
+      if (!dealMap[key]) dealMap[key] = [];
+      dealMap[key].push(d);
+    }
   });
-  Object.values(dealMap).forEach(arr => arr.sort((a,b) => b.amount - a.amount));
+  [dealMap, dealMapMQL].forEach(m => Object.values(m).forEach(a => a.sort((a, b) => b.amount - a.amount)));
 
   const YEAR_COLORS = [
-    { bg:'rgba(148,163,184,0.7)', border:'rgba(148,163,184,1)', text:'#64748b' },
-    { bg:'rgba(165,180,252,0.82)', border:'rgba(99,102,241,1)', text:'#818cf8' },
-    { bg:'rgba(99,102,241,0.9)',   border:'rgba(79,70,229,1)',  text:'#6366f1' },
+    { bg: 'rgba(148,163,184,0.70)', border: 'rgba(148,163,184,1)', text: '#64748b' },
+    { bg: 'rgba(165,180,252,0.82)', border: 'rgba(99,102,241,1)',  text: '#818cf8' },
+    { bg: 'rgba(99,102,241,0.90)',  border: 'rgba(79,70,229,1)',   text: '#6366f1' },
   ];
 
   const ctx = document.getElementById('mktQtrChart').getContext('2d');
 
+  // YoY arrows — compare TOTAL (non-MQL+MQL) across years
   const yoyPlugin = {
     id: 'yoyArrows',
     afterDatasetsDraw(chart) {
-      const {ctx: c, data} = chart;
-      [1, 2].forEach(di => {
-        const meta = chart.getDatasetMeta(di);
-        if (meta.hidden) return;
-        meta.data.forEach((bar, idx) => {
-          const cur  = data.datasets[di].data[idx] || 0;
-          const prev = data.datasets[di - 1].data[idx] || 0;
+      const { ctx: c, data } = chart;
+      // Dataset order: [2024, 2024-MQL, 2025, 2025-MQL, 2026, 2026-MQL]
+      // Pairs: 2025 vs 2024 → indices [2,3] vs [0,1]; 2026 vs 2025 → [4,5] vs [2,3]
+      [[0, 1, 2, 3], [2, 3, 4, 5]].forEach(([p0, p1, c0, c1]) => {
+        const topMeta = chart.getDatasetMeta(c1);
+        if (topMeta.hidden) return;
+        topMeta.data.forEach((bar, idx) => {
+          const cur  = (data.datasets[c0].data[idx] || 0) + (data.datasets[c1].data[idx] || 0);
+          const prev = (data.datasets[p0].data[idx] || 0) + (data.datasets[p1].data[idx] || 0);
           if (!prev || !cur) return;
-          const pct = Math.round((cur - prev) / prev * 100);
+          const pct   = Math.round((cur - prev) / prev * 100);
           const label = (pct >= 0 ? '▲' : '▼') + ' ' + Math.abs(pct) + '%';
           c.save();
-          c.font = 'bold 9px system-ui, sans-serif';
+          c.font      = 'bold 9px system-ui, sans-serif';
           c.fillStyle = pct >= 0 ? '#10b981' : '#ef4444';
-          c.textAlign = 'center';
-          c.textBaseline = 'bottom';
+          c.textAlign = 'center'; c.textBaseline = 'bottom';
           c.fillText(label, bar.x, bar.y - 2);
           c.restore();
         });
@@ -2876,13 +3020,24 @@ function renderMktByQuarterChart() {
     type: 'bar',
     data: {
       labels: qLabels,
-      datasets: YEARS.map((yr, i) => ({
-        label: String(yr),
-        data:  qLabels.map(q => byYrQ[yr][q]),
-        backgroundColor: YEAR_COLORS[i].bg,
-        borderColor:     YEAR_COLORS[i].border,
-        borderWidth: 1, borderRadius: 4,
-      }))
+      datasets: YEARS.flatMap((yr, i) => [
+        {
+          label: yr === 2026 ? '2026 (YTD)' : String(yr),
+          data:  qLabels.map(q => byYrQ[yr][q]),
+          backgroundColor: YEAR_COLORS[i].bg,
+          borderColor:     YEAR_COLORS[i].border,
+          borderWidth: 1, borderRadius: 4,
+          stack: String(yr),
+        },
+        {
+          label: yr + ' MQL',
+          data:  qLabels.map(q => byYrQMQL[yr][q]),
+          backgroundColor: MQL_BG,
+          borderColor:     MQL_BORDER,
+          borderWidth: 1, borderRadius: 3,
+          stack: String(yr),
+        }
+      ])
     },
     options: {
       responsive: true, maintainAspectRatio: false,
@@ -2892,35 +3047,39 @@ function renderMktByQuarterChart() {
       },
       scales: {
         x: { grid: { display: false } },
-        y: { beginAtZero: true, ticks: { callback: v => 'DKK ' + fmt(v) } }
+        y: { stacked: true, beginAtZero: true, ticks: { callback: v => 'DKK ' + fmt(v) } }
       }
     },
     plugins: [yoyPlugin]
   });
 
-  // HTML tooltip for quarterly inbound chart
+  // ── HTML tooltip ─────────────────────────────────────────────────────────
   const qtrCanvas  = ctx.canvas;
   const qtrTooltip = document.getElementById('mktQtrTooltip');
   let qtrHideTimer = null;
 
-  function closeQtrTooltip() { var t=document.getElementById('mktQtrTooltip'); t.classList.remove('visible'); t._pinned=false; }
-  function qtrBuildContent(yr, qLabel, deals) {
-    const yIdx = YEARS.indexOf(yr);
-    const color = YEAR_COLORS[yIdx]?.text || '#818cf8';
-    const total = deals.reduce((s,d) => s+d.amount, 0);
-    const rows = deals.map(d => {
-      const aC = d.stage === 'MQL' ? '#818cf8' : '#10b981';
+  function closeQtrTooltip() {
+    var t = document.getElementById('mktQtrTooltip');
+    t.classList.remove('visible'); t._pinned = false;
+  }
+
+  function qtrBuildContent(yr, qLabel, deals, isMql) {
+    const yIdx  = YEARS.indexOf(yr);
+    const color = isMql ? '#a78bfa' : (YEAR_COLORS[yIdx]?.text || '#818cf8');
+    const total = deals.reduce((s, d) => s + d.amount, 0);
+    const rows  = deals.map(d => {
+      const aC = d.stage === 'MQL' ? '#a78bfa' : '#10b981';
       return '<div class="ct-row">' +
-      '<span class="ct-deal-name" title="' + d.name + '">' + d.name + '</span>' +
-      '<span class="ct-amt" style="color:' + aC + '">' + (d.amount ? 'DKK ' + fmtFull(d.amount) : '—') + '</span>' +
-      '<span class="ct-src">' + d.source + '</span>' +
-      '<span class="ct-date">' + (d.createDate ? d.createDate.split('-').reverse().join('/') : '—') + '</span>' +
-      '</div>';
+        '<span class="ct-deal-name" title="' + d.name + '">' + d.name + '</span>' +
+        '<span class="ct-amt" style="color:' + aC + '">' + (d.amount ? 'DKK\u00a0' + fmtFull(d.amount) : '—') + '</span>' +
+        '<span class="ct-src">' + d.source + '</span>' +
+        '<span class="ct-date">' + (d.createDate ? d.createDate.split('-').reverse().join('/') : '—') + '</span>' +
+        '</div>';
     }).join('');
     return '<div class="ct-header">' +
-      '<span class="ct-title" style="color:' + color + '">' + yr + ' · ' + qLabel + '</span>' +
-      '<span class="ct-total">DKK ' + fmtFull(total) + ' · ' + deals.length + ' deal' + (deals.length!==1?'s':'') + '</span>' +
-      '<button class="ct-close" onclick="closeQtrTooltip()">✕</button>' +
+      '<span class="ct-title" style="color:' + color + '">' + yr + (isMql ? ' MQL' : '') + ' · ' + qLabel + '</span>' +
+      '<span class="ct-total">DKK\u00a0' + fmtFull(total) + ' · ' + deals.length + ' deal' + (deals.length !== 1 ? 's' : '') + '</span>' +
+      '<button class="ct-close" onclick="var t=document.getElementById(\'mktQtrTooltip\');t.classList.remove(\'visible\');t._pinned=false;">✕</button>' +
       '</div>' +
       '<div class="ct-col-hdr"><span>Deal name</span><span style="text-align:right">Amount</span><span>Source</span><span style="text-align:right">Created</span></div>' +
       '<div class="ct-body">' + rows + '</div>';
@@ -2928,21 +3087,23 @@ function renderMktByQuarterChart() {
 
   function qtrShow(clientX, clientY, pts, pinned) {
     if (!pts.length) return;
-    const {datasetIndex, index} = pts[0];
-    const yr     = YEARS[datasetIndex];
+    const { datasetIndex, index } = pts[0];
+    const yr     = YEARS[Math.floor(datasetIndex / 2)];
+    const isMql  = datasetIndex % 2 === 1;
     const qLabel = qLabels[index];
-    const deals  = dealMap[yr + '|' + qLabel] || [];
+    const key    = yr + '|' + qLabel + (isMql ? '|mql' : '');
+    const deals  = (isMql ? dealMapMQL : dealMap)[key] || [];
     if (!deals.length) return;
-    qtrTooltip.innerHTML = qtrBuildContent(yr, qLabel, deals);
-    qtrTooltip._pinned = pinned;
+    qtrTooltip.innerHTML = qtrBuildContent(yr, qLabel, deals, isMql);
+    qtrTooltip._pinned   = pinned;
     qtrTooltip.classList.add('visible');
-    positionAnyTooltip(qtrTooltip, clientX, clientY);
+    positionAnyTooltip(qtrTooltip);
   }
 
   qtrCanvas.addEventListener('mousemove', e => {
     if (qtrTooltip._pinned) return;
     clearTimeout(qtrHideTimer);
-    const pts = charts['mktQtr'].getElementsAtEventForMode(e, 'nearest', {intersect: true}, false);
+    const pts = charts['mktQtr'].getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
     if (!pts.length) { qtrHideTimer = setTimeout(() => { if (!qtrTooltip._pinned) qtrTooltip.classList.remove('visible'); }, 80); return; }
     qtrShow(e.clientX, e.clientY, pts, false);
   });
@@ -2951,20 +3112,22 @@ function renderMktByQuarterChart() {
     qtrHideTimer = setTimeout(() => { if (!qtrTooltip._pinned) qtrTooltip.classList.remove('visible'); }, 180);
   });
   qtrCanvas.addEventListener('click', e => {
-    const pts = charts['mktQtr'].getElementsAtEventForMode(e, 'nearest', {intersect: true}, false);
+    const pts = charts['mktQtr'].getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
     if (!pts.length) return;
     qtrShow(e.clientX, e.clientY, pts, true);
   });
   document.addEventListener('click', e => {
     if (!qtrTooltip._pinned) return;
-    if (!qtrTooltip.contains(e.target) && e.target !== qtrCanvas) { qtrTooltip.classList.remove('visible'); qtrTooltip._pinned = false; }
+    if (!qtrTooltip.contains(e.target) && e.target !== qtrCanvas) {
+      qtrTooltip.classList.remove('visible'); qtrTooltip._pinned = false;
+    }
   });
   qtrTooltip.addEventListener('mouseenter', () => clearTimeout(qtrHideTimer));
   qtrTooltip.addEventListener('mouseleave', () => { if (!qtrTooltip._pinned) qtrTooltip.classList.remove('visible'); });
   qtrCanvas.addEventListener('touchstart', e => {
     const touch = e.touches[0];
     const fakeEvt = new MouseEvent('mousemove', { clientX: touch.clientX, clientY: touch.clientY, bubbles: true });
-    const pts = charts['mktQtr'].getElementsAtEventForMode(fakeEvt, 'nearest', {intersect: true}, false);
+    const pts = charts['mktQtr'].getElementsAtEventForMode(fakeEvt, 'nearest', { intersect: true }, false);
     if (!pts.length) { qtrTooltip.classList.remove('visible'); qtrTooltip._pinned = false; return; }
     e.preventDefault();
     qtrShow(touch.clientX, touch.clientY, pts, true);
@@ -3201,6 +3364,20 @@ function updateCharts(){
   // Re-render marketing tab if it was already opened
   if (_mktRendered) renderAllMarketing();
 }
+function getYtdCutoff() {
+  let maxDate = '';
+  RAW_DEALS.forEach(d => { if (d.createDate && d.createDate > maxDate) maxDate = d.createDate; });
+  return maxDate || new Date().toISOString().slice(0,10);
+}
+function getYtdCutoffPrevYear(cutoff) {
+  return String(parseInt(cutoff.slice(0,4)) - 1) + cutoff.slice(4);
+}
+function fmtYtdLabel(cutoff) {
+  const months = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+  const p = cutoff.split('-');
+  return parseInt(p[2],10) + '. ' + months[parseInt(p[1],10)-1];
+}
+
 function updateDataDate() {
   // Find the most recent date across all deal create + close dates
   let maxDate = '';
@@ -3284,6 +3461,7 @@ document.addEventListener('DOMContentLoaded',init);
 <div id="coverageTooltip"></div>
 <div id="insightTooltip"></div>
 <div id="mktKpiTooltip"></div>
+<div id="salesKpiTooltip"></div>
 <div id="mktChannelTooltip"></div>
 <div id="mktQtrTooltip"></div>
 </body>
