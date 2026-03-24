@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pipeline Dashboard</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; }
@@ -205,20 +205,9 @@
   .upload-status.ok  { color: #16a34a; font-weight: 600; }
   .upload-status.err { color: #dc2626; font-weight: 600; }
   .upload-divider { width: 1px; height: 22px; background: #e2e8f0; flex-shrink: 0; }
-  .gh-token-input { font-size: 12px; padding: 5px 10px; border: 1.5px solid #e2e8f0; border-radius: 7px; background: white; color: #374151; width: 210px; outline: none; transition: border-color 0.2s; }
-  .gh-token-input:focus { border-color: #6366f1; }
-  .gh-token-input:disabled { background: #f1f5f9; color: #64748b; width: auto; max-width: 180px; }
-  .gh-btn { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 7px; border: 1.5px solid #cbd5e1; background: white; color: #475569; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
-  .gh-btn:hover:not(:disabled) { border-color: #6366f1; color: #6366f1; background: #f5f3ff; }
-  .gh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .gh-btn.gh-save { border-color: #16a34a; color: #16a34a; }
-  .gh-btn.gh-save:hover:not(:disabled) { background: #f0fdf4; border-color: #15803d; }
-  .gh-select { font-size: 12px; padding: 5px 10px; border: 1.5px solid #e2e8f0; border-radius: 7px; background: white; color: #374151; cursor: pointer; max-width: 240px; outline: none; }
-  .gh-select:focus { border-color: #6366f1; }
   .gh-status { font-size: 12px; color: #64748b; }
   .gh-status.ok  { color: #16a34a; font-weight: 600; }
   .gh-status.err { color: #dc2626; font-weight: 600; }
-  body.embed-mode .gh-snapshot-section { display: none; }
 
   /* ── Chart containers ───────────────────────────────────────── */
   .chart-wrap    { position: relative; height: 210px; }
@@ -505,7 +494,6 @@
   #forecastStageTooltip { min-width: 480px; max-width: 640px; }
   .fc-stage-row:hover { background: #f8fafc; }
 </style>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -514,7 +502,7 @@
     <h1>📊 Pipeline Dashboard</h1>
     <p>Coverage, generation &amp; win rate analysis · Data as of March 14, 2026</p>
   </div>
-  <div class="header-badge" id="lastUpdated">Loading…</div>
+  <div class="header-badge" id="lastUpdated">Embedded data</div>
 </div>
 
 <div id="topLoadingBar"><div id="topLoadingBarFill"></div></div>
@@ -526,17 +514,6 @@
   </label>
   <span class="upload-status" id="uploadStatus">Using embedded data (March 17, 2026)</span>
 
-  <div class="upload-divider gh-snapshot-section"></div>
-  <span class="upload-label gh-snapshot-section">🔒 Snapshots</span>
-  <input type="password" id="ghTokenInput" class="gh-token-input gh-snapshot-section"
-    placeholder="GitHub token (gist scope)" autocomplete="off"
-    onkeydown="if(event.key==='Enter') ghConnect()">
-  <button id="ghConnectBtn" class="gh-btn gh-snapshot-section" onclick="ghConnect()">Connect</button>
-  <button id="ghSaveBtn" class="gh-btn gh-save gh-snapshot-section" onclick="ghSaveSnapshot()" style="display:none">💾 Save snapshot</button>
-  <select id="ghSnapshotSelect" class="gh-select gh-snapshot-section" onchange="ghRestoreSnapshot(this.value)" style="display:none">
-    <option value="">— Load snapshot —</option>
-  </select>
-  <span class="gh-status" id="ghStatus"></span>
 </div>
 
 <div class="global-filter-bar">
@@ -1106,153 +1083,6 @@ function handleCSVUpload(input) {
   reader.readAsText(file, 'UTF-8');
 }
 
-// ── GitHub Gist Snapshot Storage ─────────────────────────────────────────────
-let ghToken = '';
-const GIST_PREFIX = 'pipeline-snapshot-';
-
-function ghSetStatus(msg, type) {
-  const el = document.getElementById('ghStatus');
-  if (!el) return;
-  el.textContent = msg;
-  el.className = 'gh-status' + (type ? ' ' + type : '');
-}
-
-function ghConnect() {
-  const input = document.getElementById('ghTokenInput');
-  const token = (input.value || '').trim();
-  if (!token) { ghSetStatus('⚠ Paste a GitHub token first', 'err'); return; }
-  ghSetStatus('Connecting…', '');
-  fetch('https://api.github.com/user', {
-    headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' }
-  })
-  .then(r => { if (!r.ok) throw new Error('Invalid token (status ' + r.status + ')'); return r.json(); })
-  .then(user => {
-    ghToken = token;
-    input.value = '';
-    input.placeholder = '✓ Connected as ' + user.login;
-    input.disabled = true;
-    const connectBtn = document.getElementById('ghConnectBtn');
-    if (connectBtn) connectBtn.style.display = 'none';
-    const saveBtn = document.getElementById('ghSaveBtn');
-    if (saveBtn) saveBtn.style.display = 'inline-flex';
-    ghSetStatus('', '');
-    ghLoadSnapshots();
-  })
-  .catch(err => ghSetStatus('✗ ' + err.message, 'err'));
-}
-
-async function ghSaveSnapshot() {
-  if (!ghToken) return;
-  const btn = document.getElementById('ghSaveBtn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Saving…';
-  const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10);
-  const timeStr = now.toTimeString().slice(0, 5).replace(':', '');
-  const filename = GIST_PREFIX + dateStr + '-' + timeStr + '.json';
-  const snapshot = { savedAt: now.toISOString(), dealCount: RAW_DEALS.length, deals: RAW_DEALS };
-  try {
-    const resp = await fetch('https://api.github.com/gists', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'token ' + ghToken,
-        'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        description: 'Pipeline Dashboard Snapshot — ' + dateStr,
-        public: false,
-        files: { [filename]: { content: JSON.stringify(snapshot) } }
-      })
-    });
-    if (!resp.ok) throw new Error('GitHub API error ' + resp.status);
-    ghSetStatus('✓ Snapshot saved (' + RAW_DEALS.length + ' deals)', 'ok');
-    ghLoadSnapshots();
-  } catch (err) {
-    ghSetStatus('✗ ' + err.message, 'err');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '💾 Save snapshot';
-  }
-}
-
-async function ghLoadSnapshots() {
-  if (!ghToken) return;
-  const select = document.getElementById('ghSnapshotSelect');
-  if (!select) return;
-  select.innerHTML = '<option value="">— Load snapshot —</option>';
-  try {
-    let page = 1, allGists = [];
-    while (true) {
-      const resp = await fetch('https://api.github.com/gists?per_page=100&page=' + page, {
-        headers: { 'Authorization': 'token ' + ghToken, 'Accept': 'application/vnd.github.v3+json' }
-      });
-      if (!resp.ok) break;
-      const gists = await resp.json();
-      if (!gists.length) break;
-      allGists = allGists.concat(gists);
-      if (gists.length < 100) break;
-      page++;
-    }
-    const snapshots = allGists
-      .filter(g => Object.keys(g.files).some(f => f.startsWith(GIST_PREFIX)))
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    snapshots.forEach(g => {
-      const fn = Object.keys(g.files).find(f => f.startsWith(GIST_PREFIX));
-      const d = new Date(g.created_at);
-      const label = d.toLocaleDateString('da-DK') + ' ' + d.toLocaleTimeString('da-DK', {hour:'2-digit',minute:'2-digit'})
-        + ' — ' + (g.description || fn);
-      const opt = document.createElement('option');
-      opt.value = g.id;
-      opt.dataset.filename = fn;
-      opt.textContent = label;
-      select.appendChild(opt);
-    });
-    select.style.display = snapshots.length ? 'inline-block' : 'none';
-  } catch (err) {
-    console.error('Failed to load snapshots:', err);
-  }
-}
-
-async function ghRestoreSnapshot(gistId) {
-  if (!gistId || !ghToken) return;
-  const select = document.getElementById('ghSnapshotSelect');
-  ghSetStatus('Loading snapshot…', '');
-  try {
-    const resp = await fetch('https://api.github.com/gists/' + gistId, {
-      headers: { 'Authorization': 'token ' + ghToken, 'Accept': 'application/vnd.github.v3+json' }
-    });
-    if (!resp.ok) throw new Error('Could not fetch snapshot');
-    const gist = await resp.json();
-    const fn = Object.keys(gist.files).find(f => f.startsWith(GIST_PREFIX));
-    const content = JSON.parse(gist.files[fn].content);
-    const deals = content.deals;
-    if (!deals || !deals.length) throw new Error('No deals found in snapshot');
-    RAW_DEALS.length = 0;
-    deals.forEach(d => RAW_DEALS.push(d));
-    const won  = deals.filter(d => d.isClosedWon).length;
-    const open = deals.filter(d => d.isOpen).length;
-    document.getElementById('lastUpdated').textContent = deals.length + ' deals · ' + won + ' won · ' + open + ' open';
-    _mktRendered = false;
-    renderKPIs();
-    renderCoverageChart(); renderPipelineGenChart(); renderAvgDealChart();
-    renderInsightBox(); renderYoYPipelineChart(); renderChannelChart();
-    renderWinRateChart(); renderSourceByQuarterChart();
-    renderWonVsTargetChart(); renderWon2025vsTarget2026Chart();
-    renderWinRateByQtrChart(); renderWinRateTable();
-    // Re-render marketing if that tab was already opened
-    if (document.getElementById('marketingTab').style.display !== 'none') {
-      renderAllMarketing(); _mktRendered = true;
-    }
-    const savedAt = content.savedAt ? new Date(content.savedAt).toLocaleDateString('da-DK') : '?';
-    ghSetStatus('✓ Loaded snapshot from ' + savedAt + ' (' + deals.length + ' deals)', 'ok');
-    if (select) select.value = '';
-  } catch (err) {
-    ghSetStatus('✗ ' + err.message, 'err');
-    console.error(err);
-  }
-}
-// ─────────────────────────────────────────────────────────────────────────────
 
 function fmt(n) {
   if (n >= 1_000_000) return (n/1_000_000).toFixed(1)+'M';
@@ -3602,7 +3432,11 @@ if (isInIframe() || hasEmbedParam()) {
   enableEmbedMode();
 }
 
-document.addEventListener('DOMContentLoaded',init);
+function safeInit() {
+  if (typeof Chart === 'undefined') { setTimeout(safeInit, 30); return; }
+  init();
+}
+document.addEventListener('DOMContentLoaded', safeInit);
 </script>
 <div id="channelTooltip"></div>
 <div id="coverageTooltip"></div>
