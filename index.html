@@ -1046,38 +1046,44 @@ function handleCSVUpload(input) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
+      status.textContent = 'Step 1/4: Parsing CSV…';
       const rows = parseCSV(e.target.result);
-      if (!rows.length) throw new Error('No rows found');
+      if (!rows.length) throw new Error('No rows found in CSV');
 
+      status.textContent = `Step 2/4: Processing ${rows.length} rows…`;
       const deals = processDeals(rows);
-      if (!deals.length) throw new Error('No deals matched the expected stage filter');
+      if (!deals.length) throw new Error(`0 deals matched stage filter (${rows.length} rows had unrecognised stages)`);
 
-      // Replace global RAW_DEALS
+      status.textContent = `Step 3/4: Loading ${deals.length} deals…`;
       RAW_DEALS.length = 0;
       deals.forEach(d => RAW_DEALS.push(d));
 
-      // Update header badge
       const won  = deals.filter(d => d.isClosedWon).length;
       const open = deals.filter(d => d.isOpen).length;
       document.getElementById('lastUpdated').textContent =
         `${deals.length} deals · ${won} won · ${open} open`;
 
-      // Re-render everything
+      status.textContent = 'Step 4/4: Rendering charts…';
       _mktRendered = false;
-    _forecastRendered = false;
-      renderKPIs();
-      renderCoverageChart();
-      renderPipelineGenChart();
-      renderAvgDealChart();
-      renderInsightBox();
-      renderYoYPipelineChart();
-      renderChannelChart();
-      renderWinRateChart();
-      renderSourceByQuarterChart();
-      renderWonVsTargetChart();
-      renderWon2025vsTarget2026Chart();
-      renderWinRateByQtrChart();
-      renderWinRateTable();
+      _forecastRendered = false;
+      const renderSteps = [
+        ['renderKPIs', renderKPIs],
+        ['renderCoverageChart', renderCoverageChart],
+        ['renderPipelineGenChart', renderPipelineGenChart],
+        ['renderAvgDealChart', renderAvgDealChart],
+        ['renderInsightBox', renderInsightBox],
+        ['renderYoYPipelineChart', renderYoYPipelineChart],
+        ['renderChannelChart', renderChannelChart],
+        ['renderWinRateChart', renderWinRateChart],
+        ['renderSourceByQuarterChart', renderSourceByQuarterChart],
+        ['renderWonVsTargetChart', renderWonVsTargetChart],
+        ['renderWon2025vsTarget2026Chart', renderWon2025vsTarget2026Chart],
+        ['renderWinRateByQtrChart', renderWinRateByQtrChart],
+        ['renderWinRateTable', renderWinRateTable],
+      ];
+      for (const [name, fn] of renderSteps) {
+        try { fn(); } catch(renderErr) { throw new Error('Failed in ' + name + ': ' + renderErr.message); }
+      }
       if (document.getElementById('marketingTab').style.display !== 'none') {
         renderAllMarketing(); _mktRendered = true;
       }
