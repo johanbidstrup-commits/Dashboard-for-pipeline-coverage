@@ -510,27 +510,49 @@
 
 <script>
 (function() {
-  const PW = 'Pipeline#826';
-  const SK = 'pd_auth';
-  function _pwCheck() {
-    const val = document.getElementById('pwInput').value;
-    if (val === PW) {
-      sessionStorage.setItem(SK, '1');
-      document.getElementById('pwOverlay').style.display = 'none';
-    } else {
-      const err = document.getElementById('pwError');
-      err.textContent = 'Forkert adgangskode — prøv igen';
-      document.getElementById('pwInput').value = '';
-      document.getElementById('pwInput').focus();
-      setTimeout(() => { err.textContent = ''; }, 3000);
+  const SK = 'pd_token';
+  const VERIFY_URL = 'https://pipeline-csv.toechoapp.workers.dev/snapshots';
+
+  async function _pwCheck() {
+    const val = document.getElementById('pwInput').value.trim();
+    if (!val) return;
+    const btn = document.querySelector('#pwOverlay button');
+    const err = document.getElementById('pwError');
+    btn.disabled = true;
+    btn.textContent = 'Verificerer…';
+    err.textContent = '';
+    try {
+      const resp = await fetch(VERIFY_URL, {
+        headers: { 'Authorization': 'Bearer ' + val }
+      });
+      if (resp.ok) {
+        sessionStorage.setItem(SK, val);
+        window.WORKER_SECRET = val;
+        window._pdAuthed = true;
+        document.getElementById('pwOverlay').style.display = 'none';
+        init();
+      } else {
+        err.textContent = 'Forkert adgangskode — prøv igen';
+        document.getElementById('pwInput').value = '';
+        document.getElementById('pwInput').focus();
+        setTimeout(() => { err.textContent = ''; }, 3000);
+      }
+    } catch(e) {
+      err.textContent = 'Netværksfejl — tjek forbindelsen og prøv igen';
     }
+    btn.disabled = false;
+    btn.textContent = 'Log ind';
   }
+
   window._pwCheck = _pwCheck;
+
   // Auto-unlock if already authenticated this session
-  if (sessionStorage.getItem(SK) === '1') {
+  const saved = sessionStorage.getItem(SK);
+  if (saved) {
+    window.WORKER_SECRET = saved;
+    window._pdAuthed = true;
     document.getElementById('pwOverlay').style.display = 'none';
   } else {
-    // Focus input on load
     setTimeout(() => {
       const inp = document.getElementById('pwInput');
       if (inp) inp.focus();
@@ -833,7 +855,7 @@
       <div class="fi-section">
         <div class="fi-label">Weighted Pipeline (Stage-sandsynlighed)</div>
         <div class="fi-desc">Hvert deal vægtes efter, hvor tæt det er på at blive vundet, baseret på dets nuværende stage. Stage-sandsynligheder: <strong>Demøde booket 10%</strong> · <strong>Indhent feedback 25%</strong> · <strong>Mere engagement 35%</strong> · <strong>Match afklaret 55%</strong> · <strong>Samarbejdsaftale sendt 75%</strong>.</div>
-        <div class="fi-formula">Weighted value = Deal amount × stage-sandsynlighed × scenarie-multiplikator<br>Konservativ ×0.7 · Base ×1.0 · Optimistisk ×1.3</div>
+        <div class="fi-formula">Weighted value = Deal amount × stage-sandsynlighed × scenarie-multiplikator<br>Konservativ ×0.7 · Base ×1.0 · Optimistisk ×1.1</div>
       </div>
       <div class="fi-section">
         <div class="fi-label">Velocity-fradrag</div>
@@ -1016,14 +1038,14 @@ function _renderSnapshotTable() {
 }
 
 window._fcParams = {
-  cons: { wr: 0.70, vel: 1.0, iq: 30/70 * 0.5 },
-  base: { wr: 1.00, vel: 1.0, iq: 30/70 * 1.0 },
-  opt:  { wr: 1.30, vel: 0.5, iq: 30/70 * 1.5 },
+  cons: { wr: 0.70, vel: 1.0, iq: 0.10 },
+  base: { wr: 1.00, vel: 1.0, iq: 0.30 },
+  opt:  { wr: 1.10, vel: 1.0, iq: 0.40 },
 };
 window._fcDefaults = {
-  cons: { wr: 0.70, vel: 1.0, iq: 30/70 * 0.5 },
-  base: { wr: 1.00, vel: 1.0, iq: 30/70 * 1.0 },
-  opt:  { wr: 1.30, vel: 0.5, iq: 30/70 * 1.5 },
+  cons: { wr: 0.70, vel: 1.0, iq: 0.10 },
+  base: { wr: 1.00, vel: 1.0, iq: 0.30 },
+  opt:  { wr: 1.10, vel: 1.0, iq: 0.40 },
 };
 
 let RAW_DEALS = []
@@ -3387,7 +3409,7 @@ function updateCharts(){
   if (_mktRendered) renderAllMarketing();
 }
 const WORKER_URL = 'https://pipeline-csv.toechoapp.workers.dev';
-const WORKER_SECRET = 'xK9!mPq38vZw';
+var WORKER_SECRET = window.WORKER_SECRET || '';
 
 function setHeaderDate(isoDate) {
   const [cy,cm,cd] = isoDate.split('-').map(Number);
@@ -3506,7 +3528,7 @@ if (isInIframe() || hasEmbedParam()) {
   enableEmbedMode();
 }
 
-document.addEventListener('DOMContentLoaded',init);
+document.addEventListener('DOMContentLoaded', () => { if (window._pdAuthed) init(); });
 </script>
 <div id="channelTooltip"></div>
 <div id="coverageTooltip"></div>
