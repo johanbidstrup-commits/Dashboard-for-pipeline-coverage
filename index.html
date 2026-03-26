@@ -830,9 +830,9 @@
   <div id="forecastInfoInline" style="display:none;padding:0 24px 16px">
     <div style="background:#1e293b;border-radius:12px;overflow:hidden;border:1px solid rgba(99,102,241,0.2)">
       <div class="fi-section">
-        <div class="fi-label">Win Rate</div>
-        <div class="fi-desc">Beregnes ud fra de <strong>seneste 4 lukkede kvartaler</strong> per kanal (Inbound / Outbound / Partner). Tæller kun deals der er vundet eller tabt — åbne deals indgår ikke.</div>
-        <div class="fi-formula">Win rate = Vundne deals ÷ (Vundne + Tabte deals)<br>Konservativ ×0.7 · Base ×1.0 · Optimistisk ×1.3</div>
+        <div class="fi-label">Weighted Pipeline (Stage-sandsynlighed)</div>
+        <div class="fi-desc">Hvert deal vægtes efter, hvor tæt det er på at blive vundet, baseret på dets nuværende stage. Stage-sandsynligheder: <strong>Demøde booket 10%</strong> · <strong>Indhent feedback 25%</strong> · <strong>Mere engagement 35%</strong> · <strong>Match afklaret 55%</strong> · <strong>Samarbejdsaftale sendt 75%</strong>.</div>
+        <div class="fi-formula">Weighted value = Deal amount × stage-sandsynlighed × scenarie-multiplikator<br>Konservativ ×0.7 · Base ×1.0 · Optimistisk ×1.3</div>
       </div>
       <div class="fi-section">
         <div class="fi-label">Velocity-fradrag</div>
@@ -899,6 +899,18 @@ const INCLUDED_STAGES = new Set([
   'Indhent feedback','Mere engagement','Samarbejdsaftale sendt',
   'Nyt lead','Demomøde booket','MQL'
 ]);
+// Stage close-probability weights (used in forecast weighted pipeline)
+const STAGE_PROB = {
+  'Demomøde booket':          0.10,
+  'Indhent feedback':         0.25,
+  'Mere engagement':          0.35,
+  'Match afklaret':           0.55,
+  'Samarbejdsaftale sendt':   0.75,
+};
+function getStageProbability(stage) {
+  return STAGE_PROB[stage] !== undefined ? STAGE_PROB[stage] : 0.20;
+}
+
 const PARTNER_SOURCES = new Set([
   'Intempus','Bam-Bus','Bam-bus','konvika','Konvika',
   'Mariendal IT','Cuneo','MADE','Made',
@@ -2232,13 +2244,14 @@ function calcForecastMRR() {
     if ((d.isClosedWon || d.isClosedLost) && d.closeQuarter) closedQSet.add(d.closeQuarter);
   });
   const last4Q = sortQuarters([...closedQSet]).slice(-4);
-  const CHANNELS = ['Inbound','Outbound','Partner','Other'];
+  const CHANNELS = ['Inbound','Outbound','Partner'];
   const wr = {};
   CHANNELS.forEach(ch => wr[ch] = { won: 0, lost: 0 });
   RAW_DEALS.forEach(d => {
     if (!last4Q.includes(d.closeQuarter)) return;
     if (!d.isClosedWon && !d.isClosedLost) return;
     const ch = chanFor(d.source);
+    if (!wr[ch]) return;
     if (d.isClosedWon)  wr[ch].won++;
     if (d.isClosedLost) wr[ch].lost++;
   });
@@ -2261,7 +2274,7 @@ function calcForecastMRR() {
     const est = estCloseDate(d.closeQuarter);
     if (!est) return;
     const days = daysBetween(d.createDate, est);
-    if (days > 0 && days < 730) velDays[chanFor(d.source)].push(days);
+    const _ch = chanFor(d.source); if (velDays[_ch] && days > 0 && days < 730) velDays[_ch].push(days);
   });
   const avgVel = {};
   CHANNELS.forEach(ch => {
@@ -2282,10 +2295,13 @@ function calcForecastMRR() {
   const q2Deals = RAW_DEALS.filter(d => d.isOpen && d.closeQuarter === nextQ && d.stage !== 'MQL');
   const byChannel = {};
   CHANNELS.forEach(ch => byChannel[ch] = []);
-  q2Deals.forEach(d => byChannel[chanFor(d.source)].push(d));
+  q2Deals.forEach(d => { const ch = chanFor(d.source); if (byChannel[ch]) byChannel[ch].push(d); });
   function scenarioChannel(ch, wrMult, velFactor) {
-    const wr_eff = Math.min(1, (winRate[ch] || 0) * wrMult);
-    return byChannel[ch].reduce((s, d) => s + d.amount * wr_eff * velDiscount(d, velFactor), 0);
+    return byChannel[ch].reduce((s, d) => {
+      const stageP = getStageProbability(d.stage);
+      const effP   = Math.min(1, stageP * wrMult);
+      return s + d.amount * effP * velDiscount(d, velFactor);
+    }, 0);
   }
   const channelDetails = {};
   CHANNELS.forEach(ch => {
@@ -2293,7 +2309,9 @@ function calcForecastMRR() {
     channelDetails[ch] = {
       count: byChannel[ch].length,
       pipeVal,
-      winRatePct: ((winRate[ch]||0)*100).toFixed(1),
+      winRatePct: byChannel[ch].length
+        ? (byChannel[ch].reduce((s,d)=>s+getStageProbability(d.stage),0)/byChannel[ch].length*100).toFixed(1)
+        : '0.0',
       avgVelDays: Math.round(avgVel[ch]||90),
       cons: scenarioChannel(ch, window._fcParams.cons.wr, window._fcParams.cons.vel),
       base: scenarioChannel(ch, window._fcParams.base.wr, window._fcParams.base.vel),
@@ -2378,7 +2396,7 @@ function renderForecastTab() {
         '<thead><tr>' +
           '<th style="padding:4px 6px;font-size:10px;color:#94a3b8;text-transform:uppercase;text-align:left">Kanal</th>' +
           '<th style="padding:4px 6px;font-size:10px;color:#94a3b8;text-transform:uppercase;text-align:right">Deals</th>' +
-          '<th style="padding:4px 6px;font-size:10px;color:#94a3b8;text-transform:uppercase;text-align:right">Win %</th>' +
+          '<th style="padding:4px 6px;font-size:10px;color:#94a3b8;text-transform:uppercase;text-align:right">Stage %</th>' +
           '<th style="padding:4px 6px;font-size:10px;color:#94a3b8;text-transform:uppercase;text-align:right">MRR</th>' +
         '</tr></thead>' +
         '<tbody>' + channelRows + '</tbody></table>' : '') +
@@ -2458,7 +2476,7 @@ function _recomputeFc() {
         '<thead><tr>' +
           '<th style="padding:4px 6px;font-size:10px;color:#94a3b8;text-transform:uppercase;text-align:left">Kanal</th>' +
           '<th style="padding:4px 6px;font-size:10px;color:#94a3b8;text-transform:uppercase;text-align:right">Deals</th>' +
-          '<th style="padding:4px 6px;font-size:10px;color:#94a3b8;text-transform:uppercase;text-align:right">Win %</th>' +
+          '<th style="padding:4px 6px;font-size:10px;color:#94a3b8;text-transform:uppercase;text-align:right">Stage %</th>' +
           '<th style="padding:4px 6px;font-size:10px;color:#94a3b8;text-transform:uppercase;text-align:right">MRR</th>' +
         '</tr></thead>' +
         '<tbody>' + channelRows + '</tbody></table>' : '') +
