@@ -142,10 +142,11 @@
 
   /* ── Global filter bar ── */
   /* ── Tab bar ── */
-  .tab-bar { display: flex; background: white; border-bottom: 2px solid #e2e8f0; padding: 0 24px; }
+  .tab-bar { display: flex; align-items: center; background: white; border-bottom: 2px solid #e2e8f0; padding: 0 24px; }
   .tab-btn { padding: 11px 20px; font-size: 13px; font-weight: 600; color: #64748b; background: none; border: none; border-bottom: 3px solid transparent; cursor: pointer; margin-bottom: -2px; transition: color 0.15s, border-color 0.15s; white-space: nowrap; }
   .tab-btn:hover { color: #374151; }
   .tab-btn.active { color: #6366f1; border-bottom-color: #6366f1; }
+  #settingsToggleBtn:hover { background: #f8fafc !important; border-color: #cbd5e1 !important; color: #374151 !important; }
   body.embed-mode .tab-bar { padding: 0 10px; }
   body.embed-mode .tab-btn { padding: 8px 14px; font-size: 12px; }
   /* ── Upload bar ── */
@@ -542,43 +543,29 @@
     <h1>📊 Pipeline Dashboard</h1>
     <p>Coverage, generation &amp; win rate analysis · Data as of <span id="dataAsOf"></span></p>
   </div>
-  <div class="header-badge" id="lastUpdated">Loading…</div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(16,185,129,0.12);color:#059669;border:1px solid rgba(16,185,129,0.3);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;letter-spacing:.03em">🔒 Sikre data</span>
+      <span style="font-size:11px;color:#94a3b8">Cloudflare R2 · Adgangskodebeskyttet</span>
+    </div>
+    <div class="header-badge" id="lastUpdated">Loading…</div>
+    <div id="uploadStatus" class="upload-status" style="font-size:11px">Loading…</div>
+  </div>
 </div>
 
-<div class="upload-bar">
-  <span class="upload-label">📂 Data Source</span>
-  <label class="upload-btn">
-    ⬆ Upload HubSpot CSV
-    <input type="file" accept=".csv" onchange="handleCSVUpload(this)">
-  </label>
-  <span class="upload-status" id="uploadStatus">Loading…</span>
 
-</div>
-
-<div class="global-filter-bar">
+<div id="settingsPanel" style="display:none;background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 24px;gap:16px;flex-wrap:wrap;align-items:center">
   <span class="gf-label">🌐 Global view from year</span>
   <select class="gf-select" id="globalFromYear" onchange="applyGlobalYear(parseInt(this.value))">
-        <option value="2023">2023</option>
-        <option value="2024">2024</option>
-        <option value="2025">2025</option>
-        <option value="2026" selected>2026</option>
+    <option value="2023">2023</option>
+    <option value="2024">2024</option>
+    <option value="2025">2025</option>
+    <option value="2026" selected>2026</option>
   </select>
-  <span class="gf-hint">Changing this resets all individual chart filters</span>
-</div>
-
-<div class="embed-toolbar">
-  <button class="embed-toolbar-btn" id="embedSettingsBtn" onclick="toggleEmbedSettings()">
-    ⚙ Targets &amp; Filters
-  </button>
-  <button class="embed-toolbar-btn" onclick="updateCharts()">
-    ↻ Update
-  </button>
-</div>
-
-<div class="targets-bar">
-  <h3>Quarterly Targets (DKK)</h3>
+  <span style="width:1px;height:20px;background:#e2e8f0;margin:0 4px"></span>
+  <h3 style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;margin:0">Quarterly Targets (DKK)</h3>
   <div class="target-inputs" id="targetInputs"></div>
-  <button class="btn-update" onclick="updateCharts()">Update Charts</button>
+  <button class="btn-update" onclick="updateCharts();_toggleSettings()">↻ Opdater</button>
 </div>
 
 
@@ -586,6 +573,11 @@
   <button class="tab-btn active" id="tab-sales" onclick="switchTab('sales')">📊 Salgs Pipeline</button>
   <button class="tab-btn" id="tab-marketing" onclick="switchTab('marketing')">📣 Marketing Pipeline</button>
   <button class="tab-btn" id="tab-forecast" onclick="switchTab('forecast')">🔮 Forecast</button>
+  <div style="margin-left:auto;display:flex;align-items:center;padding:0 12px">
+    <button id="settingsToggleBtn" onclick="_toggleSettings()" style="display:inline-flex;align-items:center;gap:5px;background:none;border:1.5px solid #e2e8f0;border-radius:7px;padding:5px 13px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;transition:all .15s">
+      ⚙ Edit
+    </button>
+  </div>
 </div>
 
 <div id="salesTab">
@@ -3215,8 +3207,9 @@ async function autoFetchCSV() {
     }
     const won2 = deals.filter(d => d.isClosedWon).length;
     const open2 = deals.filter(d => d.isOpen).length;
-    document.getElementById('uploadStatus').textContent =
-      `✓ Auto-loaded ${deals.length} deals · ${won2} won · ${open2} open`;
+    const st = document.getElementById('uploadStatus');
+    st.className = 'upload-status ok';
+    st.textContent = `✓ Auto-loaded fra Cloudflare · ${deals.length} deals · ${won2} won · ${open2} open`;
     return true;
   } catch(err) {
     console.error('Auto-fetch failed:', err);
@@ -3258,12 +3251,18 @@ function enableEmbedMode() {
     }).observe(document.documentElement);
   }
 }
-function toggleEmbedSettings() {
-  const bar = document.querySelector('.targets-bar');
-  const btn = document.getElementById('embedSettingsBtn');
-  const open = bar.classList.toggle('embed-open');
-  btn.classList.toggle('active', open);
-  btn.textContent = open ? '✕ Close' : '⚙ Targets & Filters';
+function toggleEmbedSettings() { _toggleSettings(); }
+function _toggleSettings() {
+  const panel = document.getElementById('settingsPanel');
+  const btn   = document.getElementById('settingsToggleBtn');
+  const open  = panel.style.display === 'none';
+  panel.style.display = open ? 'flex' : 'none';
+  if (btn) {
+    btn.style.background     = open ? 'rgba(99,102,241,0.08)' : 'none';
+    btn.style.borderColor    = open ? '#6366f1' : '#e2e8f0';
+    btn.style.color          = open ? '#6366f1' : '#64748b';
+    btn.textContent          = open ? '✕ Luk' : '⚙ Edit';
+  }
 }
 
 // Detect embed context before init runs
