@@ -211,6 +211,25 @@
     .insight-badge  { margin-left: 0 !important; }
   }
 
+  /* ── Forecast tab mobile ─────────────────────────────────────  */
+  @media (max-width: 900px) {
+    #forecastScenarioGrid { grid-template-columns: 1fr !important; padding: 12px 16px 0 !important; gap: 14px !important; }
+    .fc-static-params { gap: 10px; }
+    .fc-params { grid-template-columns: 1fr auto auto; }
+    #forecastInfoInline { padding: 0 16px 12px !important; }
+    #forecastInfoInline .fi-formula { font-size: 11px; }
+  }
+  @media (max-width: 680px) {
+    #forecastScenarioGrid { padding: 10px 12px 0 !important; gap: 10px !important; }
+    .fc-static-params { gap: 8px; flex-wrap: wrap; }
+    .fc-param-input { width: 52px; }
+    .fc-snapshot-header { flex-direction: column; align-items: flex-start !important; gap: 10px; }
+    #saveSnapshotBtn { width: 100%; justify-content: center; }
+    #forecastInfoInline { padding: 0 12px 12px !important; }
+    .fi-formula { word-break: break-word; }
+    #snapshotTable { overflow-x: auto; }
+  }
+
   /* ── Tablet portrait (≤900px) ────────────────────────────────  */
   @media (max-width: 900px) {
     .header { padding: 12px 16px; }
@@ -872,12 +891,12 @@
 
   <!-- Snapshot section -->
   <div style="padding:16px 24px 0">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div class="fc-snapshot-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div>
         <div style="font-size:13px;font-weight:700;color:#1e293b">📸 Forecast Snapshots</div>
         <div style="font-size:11px;color:#94a3b8;margin-top:2px">Gem forecast ved kvartalets start — sammenlign med faktisk opnået når kvartalet slutter</div>
       </div>
-      <button id="saveSnapshotBtn" onclick="_saveSnapshot()" style="display:inline-flex;align-items:center;gap:6px;background:#6366f1;color:white;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;transition:background .15s">
+      <button id="saveSnapshotBtn" onclick="_saveSnapshot()" style="display:inline-flex;align-items:center;gap:6px;background:#6366f1;color:white;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;transition:background .15s;white-space:nowrap;flex-shrink:0">
         📸 Gem snapshot
       </button>
     </div>
@@ -1346,8 +1365,8 @@ function renderKPIs() {
   const ytd26mqlVal=ytd26mql.reduce((s,d)=>s+d.amount,0);
   const ytd26=RAW_DEALS.filter(d=>d.stage!=='MQL'&&d.createDate&&d.createDate>='2026-01-01'&&d.createDate<=DATA_CUTOFF);
   const ytd26Val=ytd26.reduce((s,d)=>s+d.amount,0);
-  // Same period 2025: Jan 1 – (DATA_CUTOFF with 2026→2025)
-  const ytd25=RAW_DEALS.filter(d=>d.createDate&&d.createDate>='2025-01-01'&&d.createDate<='2025-03-14');
+  // Same period 2025: Jan 1 – equivalent date in 2025 (mirrors DATA_CUTOFF)
+  const ytd25=RAW_DEALS.filter(d=>d.stage!=='MQL'&&d.createDate&&d.createDate>='2025-01-01'&&d.createDate<=DATA_CUTOFF.replace('2026','2025'));
   const ytd25Val=ytd25.reduce((s,d)=>s+d.amount,0);
 
   const yoyDiff=ytd26Val-ytd25Val;
