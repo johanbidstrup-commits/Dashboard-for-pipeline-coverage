@@ -814,11 +814,18 @@
       <div class="chart-wrap"><canvas id="mktQtrChart"></canvas></div>
     </div>
 
-    <!-- Pipeline Velocity -->
+    <!-- Pipeline Velocity by Channel -->
     <div class="card">
       <h2>Pipeline Velocity by Channel</h2>
       <p class="subtitle">Estimeret DKK/md per kanal — won deal value × win rate ÷ gns. salgscyklus</p>
       <div class="chart-wrap" style="height:260px"><canvas id="mktVelocityChart"></canvas></div>
+    </div>
+
+    <!-- Pipeline Velocity by Source -->
+    <div class="card">
+      <h2>Pipeline Velocity by Source</h2>
+      <p class="subtitle">Estimeret DKK/md per kilde — won deal value × win rate ÷ gns. salgscyklus</p>
+      <div class="chart-wrap" style="height:280px"><canvas id="mktVelocitySrcChart"></canvas></div>
     </div>
   </div>
 </div><!-- /marketingTab -->
@@ -2490,7 +2497,7 @@ function switchTab(tab) {
   if (tab === 'marketing') {
     if (!_mktRendered) { renderAllMarketing(); _mktRendered = true; }
     setTimeout(() => {
-      ['mktChannel','mktSource','mktWinRate','mktQtr','mktVelocity'].forEach(id => {
+      ['mktChannel','mktSource','mktWinRate','mktQtr','mktVelocity','mktVelocitySrc'].forEach(id => {
         if (charts[id]) charts[id].resize();
       });
     }, 50);
@@ -2507,6 +2514,7 @@ function renderAllMarketing() {
   renderMktWinRate();
   renderMktByQuarterChart();
   renderPipelineVelocity();
+  renderPipelineVelocityBySource();
 }
 
 let _mktKpiData = {};
@@ -3030,6 +3038,98 @@ function renderPipelineVelocity() {
         data:  velocities,
         backgroundColor: CHANNELS_V.map((_,i) => COLORS_V[i].bg),
         borderColor:     CHANNELS_V.map((_,i) => COLORS_V[i].border),
+        borderWidth: 1, borderRadius: 6,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c2 => ` DKK ${fmt(c2.raw)} / måned`,
+            afterLabel: c2 => ` ${tooltipExtras[c2.dataIndex]}`,
+          }
+        }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { callback: v => 'DKK ' + fmt(v) } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ── Pipeline Velocity by Source ───────────────────────────────────────────
+function renderPipelineVelocityBySource() {
+  destroyChart('mktVelocitySrc');
+  const SOURCES_V = ['SEO','Reference','Paid','Messe','Salgsbrev'];
+  const QN = {Q1:1,Q2:4,Q3:7,Q4:10};
+  function qToMonth(q) {
+    const parts = q.split(' ');
+    return parseInt(parts[1]) * 12 + (QN[parts[0]] || 1);
+  }
+
+  // Per source: collect won/lost deals
+  const srcStats = {};
+  SOURCES_V.forEach(s => { srcStats[s] = { won: [], lost: 0 }; });
+
+  RAW_DEALS.forEach(d => {
+    const src = d.source;
+    if (!srcStats[src]) return;
+    if (d.isClosedWon && d.createQuarter && d.closeQuarter) {
+      const cycle = Math.max(1, (qToMonth(d.closeQuarter) - qToMonth(d.createQuarter)) + 3);
+      srcStats[src].won.push({ amount: d.amount, cycle });
+    }
+    if (d.isClosedLost) srcStats[src].lost++;
+  });
+
+  const velocities = SOURCES_V.map(src => {
+    const { won, lost } = srcStats[src];
+    if (!won.length) return 0;
+    const winRate  = won.length / (won.length + lost) || 0;
+    const avgDeal  = won.reduce((s,w) => s + w.amount, 0) / won.length;
+    const avgCycle = won.reduce((s,w) => s + w.cycle,  0) / won.length;
+    return Math.round((won.length * winRate * avgDeal) / avgCycle);
+  });
+
+  const tooltipExtras = SOURCES_V.map(src => {
+    const { won, lost } = srcStats[src];
+    if (!won.length) return 'Ingen vundne deals';
+    const winRate  = (won.length / (won.length + lost) * 100).toFixed(0);
+    const avgDeal  = Math.round(won.reduce((s,w) => s + w.amount, 0) / won.length);
+    const avgCycle = (won.reduce((s,w) => s + w.cycle, 0) / won.length).toFixed(1);
+    return `Win rate: ${winRate}% · Gns. deal: DKK ${fmt(avgDeal)} · Gns. cyklus: ${avgCycle} mdr`;
+  });
+
+  const PALETTE = [
+    'rgba(99,102,241,0.82)',
+    'rgba(16,185,129,0.82)',
+    'rgba(245,158,11,0.82)',
+    'rgba(236,72,153,0.82)',
+    'rgba(14,165,233,0.82)',
+  ];
+  const PALETTE_B = [
+    'rgba(99,102,241,1)',
+    'rgba(16,185,129,1)',
+    'rgba(245,158,11,1)',
+    'rgba(236,72,153,1)',
+    'rgba(14,165,233,1)',
+  ];
+
+  const canvas = document.getElementById('mktVelocitySrcChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  charts['mktVelocitySrc'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: SOURCES_V,
+      datasets: [{
+        label: 'Pipeline Velocity (DKK/md)',
+        data:  velocities,
+        backgroundColor: SOURCES_V.map((_,i) => PALETTE[i]),
+        borderColor:     SOURCES_V.map((_,i) => PALETTE_B[i]),
         borderWidth: 1, borderRadius: 6,
       }]
     },
