@@ -2861,13 +2861,24 @@ function renderMarketingKPIs() {
   const yoyPct   = ytd25Val > 0 ? (yoyDiff / ytd25Val * 100) : null;
   const yoyArrow = yoyDiff >= 0 ? '▲' : '▼';
   const yoyCls   = yoyDiff >= 0 ? 'yoy-up' : 'yoy-down';
+  // Pipeline Gen 2026 YTD (all channels, excl MQL)
+  const pgYtd26 = RAW_DEALS.filter(d => d.stage !== 'MQL' && d.createDate && d.createDate >= '2026-01-01' && d.createDate <= DATA_CUTOFF);
+  const pgYtd25 = RAW_DEALS.filter(d => d.stage !== 'MQL' && d.createDate && d.createDate >= '2025-01-01' && d.createDate <= DATA_CUTOFF.replace('2026','2025'));
+  const pgYtd26Val = pgYtd26.reduce((s,d) => s + d.amount, 0);
+  const pgYtd25Val = pgYtd25.reduce((s,d) => s + d.amount, 0);
+  const pgYoyDiff  = pgYtd26Val - pgYtd25Val;
+  const pgYoyPct   = pgYtd25Val > 0 ? (pgYoyDiff / pgYtd25Val * 100) : null;
+  const pgYoyArrow = pgYoyDiff >= 0 ? '▲' : '▼';
+  const pgYoyCls   = pgYoyDiff >= 0 ? 'yoy-up' : 'yoy-down';
+  const pgMqlVal   = RAW_DEALS.filter(d => d.stage === 'MQL' && d.createDate && d.createDate >= '2026-01-01' && d.createDate <= DATA_CUTOFF).reduce((s,d) => s + d.amount, 0);
+
   _mktKpiData = { mql, ibOpen, ibWon, ibLost, ibYtd: ytd26 };
 
   document.getElementById('mktKpiBar').innerHTML = `
     <div class="kpi-card" data-kpi="mql" style="cursor:pointer" title="Hover for deals">
       <div class="kpi-label">MQL i kø 🔍</div>
-      <div class="kpi-value">${mql.length}</div>
-      <div class="kpi-sub">DKK ${fmt(mql.reduce((s,d) => s+d.amount, 0))} i pipeline</div>
+      <div class="kpi-value">DKK ${fmt(mql.reduce((s,d) => s+d.amount, 0))}</div>
+      <div class="kpi-sub">${mql.length} deals i pipeline</div>
     </div>
     <div class="kpi-card" data-kpi="ibOpen" style="cursor:pointer" title="Hover for deals">
       <div class="kpi-label">Inbound Open Pipeline 🔍</div>
@@ -2875,9 +2886,13 @@ function renderMarketingKPIs() {
       <div class="kpi-sub">${ibOpen.length} aktive deals</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Inbound Win Rate</div>
-      <div class="kpi-value">${ibWinRate.toFixed(0)}%</div>
-      <div class="kpi-sub">${ibWon.length}W / ${ibLost.length}L · DKK ${fmt(ibWonVal)} won</div>
+      <div class="kpi-label">Pipeline Gen 2026 (YTD)</div>
+      <div class="kpi-value">DKK ${fmt(pgYtd26Val)} <span style="font-size:13px;color:#94a3b8;font-weight:400">(+&nbsp;DKK ${fmt(pgMqlVal)} MQL)</span></div>
+      <div class="kpi-sub">${pgYtd26.length} deals · Jan 1 – ${new Date(DATA_CUTOFF+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div>
+      <div class="kpi-yoy">
+        <span class="${pgYoyCls}">${pgYoyArrow} ${pgYoyPct!==null?Math.abs(pgYoyPct).toFixed(0)+'%':'—'}</span>
+        <span class="yoy-label">vs same period 2025 (DKK ${fmt(pgYtd25Val)})</span>
+      </div>
     </div>
     <div class="kpi-card" data-kpi="ibYtd" style="cursor:pointer" title="Hover for deals">
       <div class="kpi-label">Inbound Pipeline YTD 2026 🔍</div>
