@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pipeline Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; }
@@ -762,8 +763,8 @@
         <label>From year:</label>
         <select id="mktChFrom" onchange="renderMktChannelChart()">
           <option value="2024">2024</option>
-          <option value="2025" selected>2025</option>
-          <option value="2026">2026</option>
+          <option value="2025">2025</option>
+          <option value="2026" selected>2026</option>
         </select>
       </div>
       <div class="chart-wrap"><canvas id="mktChannelChart"></canvas></div>
@@ -777,8 +778,8 @@
         <label>From year:</label>
         <select id="mktSrcFrom" onchange="renderMktSourceChart()">
           <option value="2024">2024</option>
-          <option value="2025" selected>2025</option>
-          <option value="2026">2026</option>
+          <option value="2025">2025</option>
+          <option value="2026" selected>2026</option>
         </select>
       </div>
       <div class="chart-wrap"><canvas id="mktSourceChart"></canvas></div>
@@ -2882,7 +2883,7 @@ function renderMktChannelChart() {
     return null;
   }
   const metric = (document.getElementById('mktChShow')||{value:'amount'}).value;
-  const fromYr = parseInt((document.getElementById('mktChFrom')||{value:'2025'}).value) || 2025;
+  const fromYr = parseInt((document.getElementById('mktChFrom')||{value:'2026'}).value) || 2026;
   const byQ = {}, dealMap = {};
   RAW_DEALS.forEach(d => {
     const ch = channel(d.source);
@@ -2971,7 +2972,7 @@ function renderMktChannelChart() {
 
 function renderMktSourceChart() {
   destroyChart('mktSource');
-  const fromYr = parseInt((document.getElementById('mktSrcFrom')||{value:'2025'}).value) || 2025;
+  const fromYr = parseInt((document.getElementById('mktSrcFrom')||{value:'2026'}).value) || 2026;
   const byQ = {};
   RAW_DEALS.forEach(d => {
     if (!MKT_SOURCES.includes(d.source)) return;
@@ -2992,12 +2993,20 @@ function renderMktSourceChart() {
   const ctx = document.getElementById('mktSourceChart').getContext('2d');
   charts['mktSource'] = new Chart(ctx, {
     type: 'bar',
+    plugins: [ChartDataLabels],
     data: { labels: quarters, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 18 } },
       plugins: {
         legend: { position: 'top' },
-        tooltip: { callbacks: { label: c2 => ` ${c2.dataset.label}: DKK ${fmt(c2.raw)}` } }
+        tooltip: { callbacks: { label: c2 => ` ${c2.dataset.label}: DKK ${fmt(c2.raw)}` } },
+        datalabels: {
+          display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+          anchor: 'end', align: 'top',
+          formatter: v => v >= 1000 ? (v/1000).toFixed(0) + 'K' : Math.round(v),
+          font: { size: 9, weight: '600' }, color: '#475569', padding: 2,
+        }
       },
       scales: {
         x: { stacked: false, grid: { display: false } },
@@ -3036,6 +3045,7 @@ function renderMktWinRate() {
   const ctx = document.getElementById('mktWinRateChart').getContext('2d');
   charts['mktWinRate'] = new Chart(ctx, {
     type: 'bar',
+    plugins: [ChartDataLabels],
     data: {
       labels: rows.map(r => r.src),
       datasets: [{
@@ -3048,6 +3058,7 @@ function renderMktWinRate() {
     options: {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
+      layout: { padding: { right: 48 } },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -3057,6 +3068,13 @@ function renderMktWinRate() {
               return ` ${c2.raw}%  (${r.won}W / ${r.lost}L)`;
             }
           }
+        },
+        datalabels: {
+          anchor: 'end', align: 'right',
+          formatter: v => v + '%',
+          font: { size: 11, weight: '700' },
+          color: ctx => MKT_BORDERS[rows[ctx.dataIndex].i % MKT_BORDERS.length],
+          padding: { left: 6 },
         }
       },
       scales: {
@@ -3094,6 +3112,7 @@ function renderMktByQuarterChart() {
   const ctx = document.getElementById('mktQtrChart').getContext('2d');
   charts['mktQtr'] = new Chart(ctx, {
     type: 'bar',
+    plugins: [ChartDataLabels],
     data: {
       labels: qLabels,
       datasets: YEARS.map((yr, i) => ({
@@ -3106,6 +3125,7 @@ function renderMktByQuarterChart() {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 28 } },
       plugins: {
         legend: { position: 'top' },
         tooltip: {
@@ -3116,6 +3136,40 @@ function renderMktByQuarterChart() {
               return ` ${YEAR_STYLES[c2.datasetIndex].label}: DKK ${fmt(c2.raw)} (${cnt[yr][q]} deals)`;
             }
           }
+        },
+        datalabels: {
+          display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+          anchor: 'end', align: 'top',
+          font: ctx => ({ size: ctx.datasetIndex === 2 ? 10 : 8, weight: ctx.datasetIndex === 2 ? '700' : '500' }),
+          color: ctx => ctx.datasetIndex === 2 ? '#6366f1' : '#94a3b8',
+          padding: { bottom: 2 },
+          formatter: (v, ctx) => {
+            const i  = ctx.datasetIndex;
+            const qi = ctx.dataIndex;
+            const q  = qLabels[qi];
+            // For 2026 bars, add YoY arrow vs 2025
+            if (i === 2) {
+              const prev = data[2025][q] || 0;
+              const curr = v;
+              const kVal = curr >= 1000 ? (curr/1000).toFixed(0) + 'K' : Math.round(curr);
+              if (prev > 0) {
+                const pct = Math.round((curr - prev) / prev * 100);
+                const arrow = pct >= 0 ? '▲' : '▼';
+                return kVal + '\n' + arrow + ' ' + Math.abs(pct) + '%';
+              }
+              return kVal;
+            }
+            return v >= 1000 ? (v/1000).toFixed(0) + 'K' : Math.round(v);
+          },
+          // Color the arrow green/red for 2026 bars
+          color: ctx => {
+            if (ctx.datasetIndex !== 2) return '#94a3b8';
+            const q    = qLabels[ctx.dataIndex];
+            const prev = data[2025][q] || 0;
+            const curr = ctx.dataset.data[ctx.dataIndex] || 0;
+            if (prev === 0) return '#6366f1';
+            return curr >= prev ? '#059669' : '#dc2626';
+          },
         }
       },
       scales: {
@@ -3186,6 +3240,7 @@ function renderPipelineVelocity() {
   const ctx = canvas.getContext('2d');
   charts['mktVelocity'] = new Chart(ctx, {
     type: 'bar',
+    plugins: [ChartDataLabels],
     data: {
       labels: CHANNELS_V,
       datasets: [{
@@ -3199,6 +3254,7 @@ function renderPipelineVelocity() {
     options: {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: true,
+      layout: { padding: { right: 72 } },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -3206,6 +3262,12 @@ function renderPipelineVelocity() {
             label: c2 => ` DKK ${fmt(c2.raw)} / måned`,
             afterLabel: c2 => ` ${tooltipExtras[c2.dataIndex]}`,
           }
+        },
+        datalabels: {
+          display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+          anchor: 'end', align: 'right',
+          formatter: v => v >= 1000 ? 'DKK ' + (v/1000).toFixed(0) + 'K' : 'DKK ' + Math.round(v),
+          font: { size: 11, weight: '700' }, color: '#475569', padding: { left: 6 },
         }
       },
       scales: {
@@ -3278,6 +3340,7 @@ function renderPipelineVelocityBySource() {
   const ctx = canvas.getContext('2d');
   charts['mktVelocitySrc'] = new Chart(ctx, {
     type: 'bar',
+    plugins: [ChartDataLabels],
     data: {
       labels: SOURCES_V,
       datasets: [{
@@ -3291,6 +3354,7 @@ function renderPipelineVelocityBySource() {
     options: {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: true,
+      layout: { padding: { right: 72 } },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -3298,6 +3362,12 @@ function renderPipelineVelocityBySource() {
             label: c2 => ` DKK ${fmt(c2.raw)} / måned`,
             afterLabel: c2 => ` ${tooltipExtras[c2.dataIndex]}`,
           }
+        },
+        datalabels: {
+          display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+          anchor: 'end', align: 'right',
+          formatter: v => v >= 1000 ? 'DKK ' + (v/1000).toFixed(0) + 'K' : 'DKK ' + Math.round(v),
+          font: { size: 11, weight: '700' }, color: '#475569', padding: { left: 6 },
         }
       },
       scales: {
