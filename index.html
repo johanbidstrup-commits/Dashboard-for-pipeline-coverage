@@ -2871,6 +2871,8 @@ function renderMarketingKPIs() {
   const ibWonVal  = ibWon.reduce((s,d) => s + d.amount, 0);
   const ibWinRate = (ibWon.length + ibLost.length) > 0
     ? ibWon.length / (ibWon.length + ibLost.length) * 100 : 0;
+  const totalOpenVal = RAW_DEALS.filter(d => d.isOpen && d.stage !== 'MQL').reduce((s,d) => s + d.amount, 0);
+  const ibOpenPct = totalOpenVal > 0 ? (ibOpenVal / totalOpenVal * 100) : 0;
 
   const ytd26 = RAW_DEALS.filter(d => isInbound(d) && d.createDate >= '2026-01-01' && d.createDate <= DATA_CUTOFF);
   const ytd25 = RAW_DEALS.filter(d => isInbound(d) && d.createDate >= '2025-01-01' && d.createDate <= DATA_CUTOFF.replace('2026','2025'));
@@ -2901,8 +2903,8 @@ function renderMarketingKPIs() {
     </div>
     <div class="kpi-card" data-kpi="ibOpen" style="cursor:pointer" title="Hover for deals">
       <div class="kpi-label">Inbound Open Pipeline 🔍</div>
-      <div class="kpi-value">DKK ${fmt(ibOpenVal)}</div>
-      <div class="kpi-sub">${ibOpen.length} aktive deals</div>
+      <div class="kpi-value">DKK ${fmt(ibOpenVal)} <span style="font-size:13px;font-weight:600;color:#818cf8">${ibOpenPct.toFixed(0)}%</span></div>
+      <div class="kpi-sub">${ibOpen.length} aktive deals · af DKK ${fmt(totalOpenVal)} total</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Pipeline Gen 2026 (YTD)</div>
