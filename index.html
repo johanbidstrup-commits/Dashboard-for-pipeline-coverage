@@ -1598,14 +1598,14 @@ function renderCoverageChart() {
   document.getElementById('coverageIndicators').innerHTML=labels.map(q=>{
     const t=targets[q]||0,p=byCloseQ[q]||0;
     if(!t) return `<div class="cov-item"><div class="cov-ratio" style="color:#cbd5e1">—</div><div class="cov-label">${q}</div></div>`;
-    const r=p/t,cls=r>=6?'ratio-good':r>=4?'ratio-warn':'ratio-bad';
+    const r=p/t,cls=r>=6?'ratio-good':r>=3?'ratio-warn':'ratio-bad';
     return `<div class="cov-item"><div class="cov-ratio ${cls}">${r.toFixed(1)}×</div><div class="cov-label">${q}</div></div>`;
   }).join('');
   const ctx=document.getElementById('coverageChart').getContext('2d');
   charts.coverage=new Chart(ctx,{
     type:'bar',
     data:{labels,datasets:[
-      {label:'Open Pipeline',data:labels.map(q=>byCloseQ[q]||0),backgroundColor:labels.map(q=>{const t=targets[q]||0,p=byCloseQ[q]||0;if(!t)return'rgba(99,102,241,0.75)';const r=p/t;return r>=6?'rgba(22,163,74,0.75)':r>=4?'rgba(245,158,11,0.75)':'rgba(220,38,38,0.75)';}),borderRadius:6,order:2,yAxisID:'y'},
+      {label:'Open Pipeline',data:labels.map(q=>byCloseQ[q]||0),backgroundColor:labels.map(q=>{const t=targets[q]||0,p=byCloseQ[q]||0;if(!t)return'rgba(99,102,241,0.75)';const r=p/t;return r>=6?'rgba(22,163,74,0.75)':r>=3?'#f5b400':'rgba(220,38,38,0.75)';}),borderRadius:6,order:2,yAxisID:'y'},
       {label:'Target',data:labels.map(q=>targets[q]||0),type:'line',borderColor:'#f59e0b',borderWidth:2.5,borderDash:[6,4],pointBackgroundColor:'#f59e0b',pointRadius:5,fill:false,order:1,yAxisID:'y'},
       {label:'Coverage Ratio',data:labels.map(q=>(targets[q]||0)>0?+((byCloseQ[q]||0)/(targets[q]||0)).toFixed(2):null),type:'line',borderColor:'#10b981',borderWidth:2.5,pointBackgroundColor:'#10b981',pointRadius:5,fill:false,order:0,yAxisID:'y2'}
     ]},
